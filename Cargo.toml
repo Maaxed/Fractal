@@ -1,0 +1,23 @@
+[package]
+name = "fractal_renderer"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["shader"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Compile build-dependencies in release mode with the same settings as regular dependencies.
+[profile.release.build-override]
+opt-level = 3
+codegen-units = 16
+[profile.dev.build-override]
+opt-level = 3
+
+[build-dependencies]
+spirv-builder = "0.8"
+
+[dependencies]
+futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
+wgpu = { version = "0.16", features = ["spirv", "vulkan-portability"] }

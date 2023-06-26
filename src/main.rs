@@ -42,7 +42,8 @@ async fn run()
         &wgpu::BindGroupLayoutDescriptor
         {
             label: None,
-            entries: &[wgpu::BindGroupLayoutEntry {
+            entries: &[wgpu::BindGroupLayoutEntry
+            {
                 binding: 0,
                 count: None,
                 visibility: wgpu::ShaderStages::COMPUTE,
@@ -72,13 +73,14 @@ async fn run()
             entry_point: "compute_mandelbrot",
         });
     
-    let size = 64;
+    let size = 64u32;
+    let mem_size = (size * size * std::mem::size_of::<u32>() as u32) as wgpu::BufferAddress;
     
     let readback_buffer = device.create_buffer(
         &wgpu::BufferDescriptor
         {
             label: None,
-            size: size as wgpu::BufferAddress,
+            size: mem_size,
             // Can be read to the CPU, and can be copied from the shader's storage buffer
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -88,7 +90,7 @@ async fn run()
         &wgpu::BufferDescriptor
         {
             label: Some("Output"),
-            size: size as wgpu::BufferAddress,
+            size: mem_size,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
@@ -111,7 +113,7 @@ async fn run()
         let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
         compute_pass.set_bind_group(0, &bind_group, &[]);
         compute_pass.set_pipeline(&compute_pipeline);
-        compute_pass.dispatch_workgroups(size, 1, 1);
+        compute_pass.dispatch_workgroups(size, size, 1);
     }
 
     commands.copy_buffer_to_buffer(
@@ -119,7 +121,7 @@ async fn run()
         0,
         &readback_buffer,
         0,
-        size as wgpu::BufferAddress,
+        mem_size,
     );
     
     queue.submit(Some(commands.finish()));
@@ -130,10 +132,20 @@ async fn run()
 
     let result = buffer_slice.get_mapped_range()
         .chunks_exact(4)
-        .map(|b| u32::from_ne_bytes(b.try_into().unwrap()))
-        .collect::<Vec<_>>();
+        .map(|bytes| u32::from_ne_bytes(bytes.try_into().unwrap()))
+        .collect::<Vec<_>>()
+        .chunks_exact(size as usize)
+        .map(|line| line.to_vec())
+        .collect::<Vec<Vec<u32>>>();
 
-    dbg!(result);
+    for line in result
+    {
+        for c in line
+        {
+            print!("{c:>3}");
+        }
+        println!();
+    }
     
     readback_buffer.unmap();
 }

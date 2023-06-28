@@ -21,3 +21,4 @@ spirv-builder = "0.8"
 [dependencies]
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
 wgpu = { version = "0.16", features = ["spirv", "vulkan-portability"] }
+winit = "0.28.6"

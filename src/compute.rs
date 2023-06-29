@@ -123,7 +123,7 @@ impl Compute
                 layout: wgpu::ImageDataLayout
                 {
                     offset: 0,
-                    bytes_per_row: Some(64 * std::mem::size_of::<u32>() as u32),
+                    bytes_per_row: Some(self.size * std::mem::size_of::<u32>() as u32),
                     rows_per_image: None
                 }
             },

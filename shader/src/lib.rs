@@ -6,6 +6,11 @@ mod complex;
 use spirv_std::{spirv, Image, Sampler};
 use spirv_std::glam::{UVec3, Vec2, Vec4, vec4, vec2};
 
+pub fn color_to_byte(color: f32) -> u32
+{
+    (color * 255.5) as u32
+}
+
 #[spirv(compute(threads(1, 1)))]
 pub fn compute_mandelbrot(
     #[spirv(global_invocation_id)] id: UVec3,
@@ -15,7 +20,15 @@ pub fn compute_mandelbrot(
 {
     let index = id.x + id.y * group_count.x;
     let c = Vec2::new(id.x as f32 / (group_count.x as f32 - 1.0), id.y as f32 / (group_count.y as f32 - 1.0)) * 4.0 - Vec2::ONE * 2.0;
-    output[index as usize] = mandelbrot::mandelbrot_value(c);
+    let v = mandelbrot::mandelbrot_value(c);
+
+    // Gradient: black - red - yellow - white
+    let threshold1 = 0.2;
+    let threshold2 = 0.6;
+    let r = if v > threshold1 { 1.0 } else { v / threshold1 };
+    let g = if v > threshold2 { 1.0 } else if v > threshold1 { (v - threshold1) / (threshold2 - threshold1) } else { 0.0 };
+    let b = if v > threshold2 { (v - threshold2) / (1.0 - threshold2) } else { 0.0 };
+    output[index as usize] = (color_to_byte(r) << 16) | (color_to_byte(g) << 8) | color_to_byte(b) | 0xff000000;
 }
 
 

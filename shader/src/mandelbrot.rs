@@ -1,9 +1,9 @@
 use spirv_std::glam::Vec2;
 use crate::complex::Complex;
 
-const ITERATION_COUNT: u32 = 255;
+const ITERATION_COUNT: u32 = 512;
 
-pub fn mandelbrot_value(c: Vec2) -> u32
+pub fn mandelbrot_value(c: Vec2) -> f32
 {
     let mut z = Vec2::ZERO;
 
@@ -12,10 +12,10 @@ pub fn mandelbrot_value(c: Vec2) -> u32
         let length_squared = z.length_squared();
         if length_squared > 4.0
         {
-            return i;
+            return i as f32 / ITERATION_COUNT as f32;
         }
         z = z.comp_squared() + c;
     }
 
-    ITERATION_COUNT
+    1.0
 }

@@ -21,7 +21,7 @@ impl App
                 source: wgpu::util::make_spirv(SHADER_CODE),
             });
 		
-    	let size = 64;
+    	let size = 1024;
     	let compute = crate::compute::Compute::new(&shader_module, &target, size);
 		
 		let render = crate::render::Render::new(&shader_module, &target, size);

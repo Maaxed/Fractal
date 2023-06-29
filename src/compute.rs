@@ -110,6 +110,34 @@ impl Compute
         );
     }
 
+    pub fn copy_buffer_to_texture(
+        &self,
+        commands: &mut wgpu::CommandEncoder,
+        destination: &wgpu::Texture,
+    )
+    {
+        commands.copy_buffer_to_texture(
+            wgpu::ImageCopyBuffer
+            {
+                buffer: self.buffer(),
+                layout: wgpu::ImageDataLayout
+                {
+                    offset: 0,
+                    bytes_per_row: Some(64 * std::mem::size_of::<u32>() as u32),
+                    rows_per_image: None
+                }
+            },
+            wgpu::ImageCopyTexture
+            {
+                texture: destination,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            destination.size()
+        );
+    }
+
     pub fn read_buffer(&self, buffer: &BufferView) -> Vec<u32>
     {
         buffer

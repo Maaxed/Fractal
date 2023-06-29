@@ -24,17 +24,17 @@ impl App
     	let size = 64;
     	let compute = crate::compute::Compute::new(&shader_module, &target, size);
 		
-		let render = crate::render::Render::new(&shader_module, &target);
+		let render = crate::render::Render::new(&shader_module, &target, size);
 
 		Self
 		{
 			target,
 			render,
-			compute
+			compute,
 		}
 	}
 
-	pub fn do_compute(&self)
+	pub fn do_print_compute(&self)
 	{
 		let readback_buffer = self.target.device.create_buffer(
         &wgpu::BufferDescriptor
@@ -72,6 +72,17 @@ impl App
 		readback_buffer.unmap();
 	}
 
+	pub fn do_compute(&self)
+	{
+		let mut commands = self.target.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+		self.compute.make_compute_pass(&mut commands);
+
+		self.compute.copy_buffer_to_texture(&mut commands, &self.render.fractal_texture);
+		
+		self.target.queue.submit(std::iter::once(commands.finish()));
+	}
+
 	pub fn do_render(&self) -> Result<(), wgpu::SurfaceError>
 	{
 		let output = self.target.surface.get_current_texture()?;
@@ -89,6 +100,8 @@ impl App
 
 	pub fn run(mut self, event_loop: EventLoop<()>) -> !
 	{
+		self.do_compute();
+		
 		event_loop.run(move
 			|event, _, control_flow|
 			match event

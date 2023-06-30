@@ -13,14 +13,18 @@ pub fn color_to_byte(color: f32) -> u32
 
 #[spirv(compute(threads(1, 1)))]
 pub fn compute_mandelbrot(
+    // Inputs
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(num_workgroups)] group_count: UVec3,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] output: &mut [u32],
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] params : &fractal_renderer_shared::ComputeParams,
+
+    // Outputs
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] output: &mut [u32],
 )
 {
     let index = id.x + id.y * group_count.x;
     let c = Vec2::new(id.x as f32 / (group_count.x as f32 - 1.0), id.y as f32 / (group_count.y as f32 - 1.0)) * 4.0 - Vec2::ONE * 2.0;
-    let v = mandelbrot::mandelbrot_value(c);
+    let v = mandelbrot::mandelbrot_value(params.pos + c / params.zoom);
 
     // Gradient: black - red - yellow - white
     let threshold1 = 0.2;

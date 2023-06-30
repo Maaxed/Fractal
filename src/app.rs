@@ -1,5 +1,7 @@
+use glam::{DVec2, dvec2};
+use winit::dpi::PhysicalPosition;
 use winit::event_loop::{EventLoop, ControlFlow};
-use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode};
+use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseScrollDelta, MouseButton};
 
 const SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader.spv"));
 
@@ -8,6 +10,10 @@ pub struct App
 	target: crate::Target,
 	render: crate::render::Render,
 	compute: crate::compute::Compute,
+	zoom: f64,
+	pos: DVec2,
+	prev_mouse_pos: Option<PhysicalPosition<f64>>,
+	mouse_down: bool
 }
 
 impl App
@@ -21,7 +27,7 @@ impl App
                 source: wgpu::util::make_spirv(SHADER_CODE),
             });
 		
-    	let size = 1024;
+    	let size = 512;
     	let compute = crate::compute::Compute::new(&shader_module, &target, size);
 		
 		let render = crate::render::Render::new(&shader_module, &target, size);
@@ -31,6 +37,10 @@ impl App
 			target,
 			render,
 			compute,
+			zoom: 1.0,
+			pos: DVec2::ZERO,
+			prev_mouse_pos: None,
+			mouse_down: false
 		}
 	}
 
@@ -98,19 +108,30 @@ impl App
 		Ok(())
 	}
 
+	pub fn redraw(&self) -> Result<(), wgpu::SurfaceError>
+	{
+		self.compute.set_params(&self.target.queue,
+			&fractal_renderer_shared::ComputeParams
+			{
+				zoom: self.zoom as f32,
+				pos: self.pos.as_vec2(),
+				padding: 0,
+			});
+		self.do_compute();
+		self.do_render()
+	}
+
 	pub fn run(mut self, event_loop: EventLoop<()>) -> !
 	{
-		self.do_compute();
-		
 		event_loop.run(move
 			|event, _, control_flow|
 			match event
 			{
 				Event::RedrawRequested(window_id) if window_id == self.target.window.id() =>
 				{
-					match self.do_render()
+					match self.redraw()
 					{
-						Ok(_) => {}
+						Ok(_) => {},
 						// Reconfigure the surface if lost
 						Err(wgpu::SurfaceError::Lost) => self.target.configure_surface(),
 						// The system is out of memory, we should probably quit
@@ -118,11 +139,6 @@ impl App
 						// All other errors (Outdated, Timeout) should be resolved by the next frame
 						Err(e @ wgpu::SurfaceError::Outdated | e @ wgpu::SurfaceError::Timeout) => eprintln!("{:?}", e),
 					}
-				}
-				Event::MainEventsCleared =>
-				{
-					// RedrawRequested will only trigger once, unless we manually request it.
-					self.target.window.request_redraw();
 				},
 				Event::WindowEvent { window_id, ref event} if window_id == self.target.window.id() =>
 				{
@@ -148,6 +164,38 @@ impl App
 								},
 							..
 						} => *control_flow = ControlFlow::Exit,
+						WindowEvent::MouseWheel { delta, .. } =>
+						{
+							match delta
+							{
+								MouseScrollDelta::LineDelta(_dx, dy) =>
+								{
+									self.zoom *= (*dy as f64).exp();
+									self.target.window.request_redraw();
+								},
+								MouseScrollDelta::PixelDelta(delta) =>
+								{
+									self.zoom *= delta.y.exp();
+									self.target.window.request_redraw();
+								},
+							}
+						},
+						WindowEvent::MouseInput { button: MouseButton::Left, state, ..} =>
+						{
+							self.mouse_down = *state == ElementState::Pressed;
+						},
+						WindowEvent::CursorMoved { position, .. } =>
+						{
+							if self.mouse_down
+							{
+								if let Some(prev_pos) = self.prev_mouse_pos
+								{
+									self.pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * 0.01 / self.zoom;
+									self.target.window.request_redraw();
+								}
+							}
+							self.prev_mouse_pos = Some(*position);
+						}
 						_ => {}
 					}
 				},

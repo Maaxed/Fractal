@@ -7,4 +7,5 @@ edition = "2021"
 crate-type = ["dylib"]
 
 [dependencies]
-spirv-std = { version = "0.8" }
+spirv-std = "0.8"
+fractal_renderer_shared = { path = "../shared" }

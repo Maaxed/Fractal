@@ -4,7 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["shader"]
+members = ["shader", "shared"]
+
+[workspace.dependencies]
+glam = { version = "0.24", default-features = false }
+bytemuck = { version = "1.13", features = ["derive"] }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -22,3 +26,6 @@ spirv-builder = "0.8"
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
 wgpu = { version = "0.16", features = ["spirv", "vulkan-portability"] }
 winit = "0.28.6"
+glam = { workspace = true, default-features = true, features = ["bytemuck"] }
+bytemuck = { workspace = true }
+fractal_renderer_shared = { path = "./shared", features = ["bytemuck"] }

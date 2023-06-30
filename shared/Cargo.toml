@@ -1,0 +1,13 @@
+[package]
+name = "fractal_renderer_shared"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+bytemuck = ["dep:bytemuck", "glam/bytemuck"]
+
+[dependencies]
+glam = { workspace = true, default-features = false }
+bytemuck = { workspace = true, optional = true }

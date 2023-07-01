@@ -29,3 +29,4 @@ winit = "0.28.6"
 glam = { workspace = true, default-features = true, features = ["bytemuck"] }
 bytemuck = { workspace = true }
 fractal_renderer_shared = { path = "./shared", features = ["bytemuck"] }
+env_logger = "0.10"

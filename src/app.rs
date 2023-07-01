@@ -113,9 +113,9 @@ impl App
 		self.compute.set_params(&self.target.queue,
 			&fractal_renderer_shared::ComputeParams
 			{
-				zoom: self.zoom as f32,
-				pos: self.pos.as_vec2(),
-				padding: 0,
+				pos: self.pos,
+				zoom: self.zoom,
+				padding: 0.0,
 			});
 		self.do_compute();
 		self.do_render()
@@ -190,7 +190,7 @@ impl App
 							{
 								if let Some(prev_pos) = self.prev_mouse_pos
 								{
-									self.pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * 0.01 / self.zoom;
+									self.pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * 0.006 / self.zoom;
 									self.target.window.request_redraw();
 								}
 							}

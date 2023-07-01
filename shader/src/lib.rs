@@ -1,10 +1,11 @@
 #![no_std]
+#![deny(warnings)]
 
 mod mandelbrot;
 mod complex;
 
 use spirv_std::{spirv, Image, Sampler};
-use spirv_std::glam::{UVec3, Vec2, Vec4, vec4, vec2};
+use spirv_std::glam::{UVec3, DVec2, Vec2, Vec4, vec4, vec2};
 
 pub fn color_to_byte(color: f32) -> u32
 {
@@ -23,7 +24,7 @@ pub fn compute_mandelbrot(
 )
 {
     let index = id.x + id.y * group_count.x;
-    let c = Vec2::new(id.x as f32 / (group_count.x as f32 - 1.0), id.y as f32 / (group_count.y as f32 - 1.0)) * 4.0 - Vec2::ONE * 2.0;
+    let c = DVec2::new(id.x as f64 / (group_count.x as f64 - 1.0), id.y as f64 / (group_count.y as f64 - 1.0)) * 4.0 - DVec2::splat(2.0);
     let v = mandelbrot::mandelbrot_value(params.pos + c / params.zoom);
 
     // Gradient: black - red - yellow - white

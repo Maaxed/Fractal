@@ -1,11 +1,11 @@
-use spirv_std::glam::Vec2;
+use spirv_std::glam::DVec2;
 use crate::complex::Complex;
 
 const ITERATION_COUNT: u32 = 512;
 
-pub fn mandelbrot_value(c: Vec2) -> f32
+pub fn mandelbrot_value(c: DVec2) -> f32
 {
-    let mut z = Vec2::ZERO;
+    let mut z = DVec2::ZERO;
 
     for i in 0..ITERATION_COUNT
     {

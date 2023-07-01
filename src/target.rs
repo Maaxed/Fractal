@@ -31,7 +31,7 @@ impl Target
 				&wgpu::DeviceDescriptor
 				{
 					label: None,
-					features: wgpu::Features::empty(),
+					features: wgpu::Features::SHADER_F64,
 					limits: wgpu::Limits::default(),
 				},
 				None,

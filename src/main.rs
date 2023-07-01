@@ -13,6 +13,7 @@ fn main()
 
 async fn run()
 {
+    env_logger::init();
     let event_loop = winit::event_loop::EventLoop::new();
     
     let target = Target::new(&event_loop).await;

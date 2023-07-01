@@ -1,6 +1,6 @@
 #![no_std]
 
-use glam::Vec2;
+use glam::DVec2;
 #[cfg(feature = "bytemuck")]
 use bytemuck::NoUninit;
 
@@ -8,9 +8,9 @@ use bytemuck::NoUninit;
 #[cfg_attr(feature = "bytemuck", derive(Debug, Copy, Clone, NoUninit))]
 pub struct ComputeParams
 {
-    pub zoom: f32,
-    pub padding: u32,
-    pub pos: Vec2,
+    pub pos: DVec2,
+    pub zoom: f64,
+    pub padding: f64,
 }
 
 impl Default for ComputeParams
@@ -19,9 +19,9 @@ impl Default for ComputeParams
     {
         Self
         {
+            pos: DVec2::ZERO,
             zoom: 1.0,
-            pos: Vec2::ZERO,
-            padding: 0,
+            padding: 0.0
         }
     }
 }

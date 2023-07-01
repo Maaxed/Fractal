@@ -24,7 +24,9 @@ pub fn compute_mandelbrot(
 )
 {
     let index = id.x + id.y * group_count.x;
-    let c = DVec2::new(id.x as f64 / (group_count.x as f64 - 1.0), id.y as f64 / (group_count.y as f64 - 1.0)) * 4.0 - DVec2::splat(2.0);
+    let scale = (if group_count.x < group_count.y { group_count.x } else { group_count.y }) as f64 - 1.0;
+    let c = DVec2::new(id.x as f64 / scale, id.y as f64 / scale) * 4.0 - DVec2::splat(2.0);
+    //let c = DVec2::new(id.x as f64 / (group_count.x as f64 - 1.0), id.y as f64 / (group_count.y as f64 - 1.0)) * 4.0 - DVec2::splat(2.0);
     let v = mandelbrot::mandelbrot_value(params.pos + c / params.zoom);
 
     // Gradient: black - red - yellow - white

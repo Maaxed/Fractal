@@ -1,5 +1,5 @@
 use glam::{DVec2, dvec2};
-use winit::dpi::PhysicalPosition;
+use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseScrollDelta, MouseButton};
 
@@ -27,10 +27,10 @@ impl App
                 source: wgpu::util::make_spirv(SHADER_CODE),
             });
 		
-    	let size = 512;
-    	let compute = crate::compute::Compute::new(&shader_module, &target, size);
+    	let size = target.window.inner_size();
+    	let compute = crate::compute::Compute::new(&target, &shader_module, size);
 		
-		let render = crate::render::Render::new(&shader_module, &target, size);
+		let render = crate::render::Render::new(&target, &shader_module, size);
 
 		Self
 		{
@@ -43,6 +43,13 @@ impl App
 			mouse_down: false
 		}
 	}
+
+    pub fn resize(&mut self, new_size: PhysicalSize<u32>)
+	{
+		self.target.resize(new_size);
+		self.compute.resize(&self.target, new_size);
+		self.render.resize(&self.target, new_size);
+    }
 
 	pub fn do_print_compute(&self)
 	{
@@ -70,7 +77,7 @@ impl App
 
 		let result = self.compute.read_buffer(&buffer_slice.get_mapped_range());
 
-		for line in result.chunks_exact(self.compute.size as usize)
+		for line in result.chunks_exact(self.compute.size().width as usize)
 		{
 			for c in line
 			{
@@ -88,7 +95,7 @@ impl App
 
 		self.compute.make_compute_pass(&mut commands);
 
-		self.compute.copy_buffer_to_texture(&mut commands, &self.render.fractal_texture);
+		self.compute.copy_buffer_to_texture(&mut commands, self.render.fractal_texture());
 		
 		self.target.queue.submit(std::iter::once(commands.finish()));
 	}
@@ -147,12 +154,12 @@ impl App
 						WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
 						WindowEvent::Resized(physical_size) =>
 						{
-							self.target.resize(*physical_size);
+							self.resize(*physical_size);
 						},
 						WindowEvent::ScaleFactorChanged { new_inner_size, .. } =>
 						{
 							// new_inner_size is &&mut so we have to dereference it twice
-							self.target.resize(**new_inner_size);
+							self.resize(**new_inner_size);
 						},
 						WindowEvent::KeyboardInput
 						{

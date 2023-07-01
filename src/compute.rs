@@ -1,22 +1,41 @@
 use wgpu::{ComputePipeline, Buffer, BindGroup, CommandEncoder, BufferAddress, BufferView};
+use winit::dpi::PhysicalSize;
 
 use crate::Target;
 
 pub struct Compute
 {
-    pub size: u32,
-    params_buffer: Buffer,
-    output_buffer: Buffer,
-    bind_group: BindGroup,
-    compute_pipeline: ComputePipeline,
+    fixed: Fixed,
+    dynamic: Dynamic,
 }
 
-impl Compute
+struct Fixed
 {
-    pub fn new(shader_module: &wgpu::ShaderModule, target: &Target, size: u32) -> Self
-    {
-        let mem_size = (size * size * std::mem::size_of::<u32>() as u32) as wgpu::BufferAddress;
+    compute_pipeline: ComputePipeline,
+    bind_group_layout: wgpu::BindGroupLayout,
+    params_buffer: Buffer,
+}
 
+struct Dynamic
+{
+    size: PhysicalSize<u32>,
+    bind_group: BindGroup,
+    output_buffer: Buffer,
+}
+
+impl Fixed
+{
+    fn new(target: &Target, shader_module: &wgpu::ShaderModule) -> Self
+    {
+        let params_buffer = target.device.create_buffer(
+            &wgpu::BufferDescriptor
+            {
+                label: Some("params"),
+                size: std::mem::size_of::<fractal_renderer_shared::ComputeParams>() as u64,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+        
         let bind_group_layout = target.device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor
             {
@@ -49,43 +68,6 @@ impl Compute
                 ],
             });
 
-        let params_buffer = target.device.create_buffer(
-            &wgpu::BufferDescriptor
-            {
-                label: Some("params"),
-                size: std::mem::size_of::<fractal_renderer_shared::ComputeParams>() as u64,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-
-        let output_buffer = target.device.create_buffer(
-            &wgpu::BufferDescriptor
-            {
-                label: Some("output"),
-                size: mem_size,
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
-                mapped_at_creation: false,
-            });
-    
-        let bind_group = target.device.create_bind_group(
-            &wgpu::BindGroupDescriptor
-            {
-                label: Some("compute_bind_group"),
-                layout: &bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry
-                    {
-                        binding: 0,
-                        resource: params_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry
-                    {
-                        binding: 1,
-                        resource: output_buffer.as_entire_binding(),
-                    }
-                ],
-            });
-
         let pipeline_layout = target.device.create_pipeline_layout(
             &wgpu::PipelineLayoutDescriptor
             {
@@ -102,28 +84,100 @@ impl Compute
                 module: shader_module,
                 entry_point: "compute_mandelbrot",
             });
+        
+        Self
+        {
+            compute_pipeline,
+            bind_group_layout,
+            params_buffer,
+        }
+    }
+}
+
+impl Dynamic
+{
+    fn new(target: &Target, fixed: &Fixed, size: PhysicalSize<u32>) -> Self
+    {
+        let size = PhysicalSize
+        {
+            width: wgpu::util::align_to(size.width, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / std::mem::size_of::<u32>() as u32),
+            height: size.height
+        };
+        
+        let mem_size = (size.width * size.height * std::mem::size_of::<u32>() as u32) as wgpu::BufferAddress;
+        
+        let output_buffer = target.device.create_buffer(
+            &wgpu::BufferDescriptor
+            {
+                label: Some("output"),
+                size: mem_size,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+                mapped_at_creation: false,
+            });
+    
+        let bind_group = target.device.create_bind_group(
+            &wgpu::BindGroupDescriptor
+            {
+                label: Some("compute_bind_group"),
+                layout: &fixed.bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry
+                    {
+                        binding: 0,
+                        resource: fixed.params_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry
+                    {
+                        binding: 1,
+                        resource: output_buffer.as_entire_binding(),
+                    }
+                ],
+            });
 
         Self
         {
             size,
-            params_buffer,
-            output_buffer,
             bind_group,
-            compute_pipeline
+            output_buffer,
         }
+    }
+}
+
+impl Compute
+{
+    pub fn new(target: &Target, shader_module: &wgpu::ShaderModule, size: PhysicalSize<u32>) -> Self
+    {
+        let fixed = Fixed::new(target, shader_module);
+        let dynamic = Dynamic::new(target, &fixed, size);
+
+        Self
+        {
+            fixed,
+            dynamic,
+        }
+    }
+
+    pub fn resize(&mut self, target: &crate::Target, new_size: PhysicalSize<u32>)
+	{
+        self.dynamic = Dynamic::new(target, &self.fixed, new_size);
     }
 
     pub fn buffer(&self) -> &Buffer
     {
-        &self.output_buffer
+        &self.dynamic.output_buffer
+    }
+
+    pub fn size(&self) -> PhysicalSize<u32>
+    {
+        self.dynamic.size
     }
 
     pub fn make_compute_pass(&self, commands: &mut CommandEncoder)
     {
         let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
-        compute_pass.set_bind_group(0, &self.bind_group, &[]);
-        compute_pass.set_pipeline(&self.compute_pipeline);
-        compute_pass.dispatch_workgroups(self.size, self.size, 1);
+        compute_pass.set_bind_group(0, &self.dynamic.bind_group, &[]);
+        compute_pass.set_pipeline(&self.fixed.compute_pipeline);
+        compute_pass.dispatch_workgroups(self.dynamic.size.width, self.dynamic.size.height, 1);
     }
 
     pub fn set_params(
@@ -132,7 +186,7 @@ impl Compute
         params: &fractal_renderer_shared::ComputeParams
     )
     {
-        queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(params));
+        queue.write_buffer(&self.fixed.params_buffer, 0, bytemuck::bytes_of(params));
     }
 
     pub fn copy_buffer(
@@ -164,7 +218,7 @@ impl Compute
                 layout: wgpu::ImageDataLayout
                 {
                     offset: 0,
-                    bytes_per_row: Some(self.size * std::mem::size_of::<u32>() as u32),
+                    bytes_per_row: Some(self.dynamic.size.width * std::mem::size_of::<u32>() as u32),
                     rows_per_image: None
                 }
             },

@@ -1,7 +1,7 @@
 use spirv_std::glam::DVec2;
 use crate::complex::Complex;
 
-const ITERATION_COUNT: u32 = 512;
+const ITERATION_COUNT: u32 = 1024;
 
 pub fn mandelbrot_value(c: DVec2) -> f32
 {

@@ -5,14 +5,15 @@ mod mandelbrot;
 mod complex;
 
 use spirv_std::{spirv, Image, Sampler};
-use spirv_std::glam::{UVec3, DVec2, Vec2, Vec4, vec4, vec2};
+use spirv_std::glam::{UVec3, DVec2, UVec2, Vec2, Vec4, vec4, vec2, uvec2};
 
 pub fn color_to_byte(color: f32) -> u32
 {
     (color * 255.5) as u32
 }
 
-#[spirv(compute(threads(1, 1)))]
+const WORKGROUP_SIZE: UVec2 = uvec2(16, 16);
+#[spirv(compute(threads(16, 16)))]
 pub fn compute_mandelbrot(
     // Inputs
     #[spirv(global_invocation_id)] id: UVec3,
@@ -23,10 +24,10 @@ pub fn compute_mandelbrot(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] output: &mut [u32],
 )
 {
-    let index = id.x + id.y * group_count.x;
-    let scale = (if group_count.x < group_count.y { group_count.x } else { group_count.y }) as f64 - 1.0;
-    let c = DVec2::new(id.x as f64 / scale, id.y as f64 / scale) * 4.0 - DVec2::splat(2.0);
-    //let c = DVec2::new(id.x as f64 / (group_count.x as f64 - 1.0), id.y as f64 / (group_count.y as f64 - 1.0)) * 4.0 - DVec2::splat(2.0);
+    let size = uvec2(group_count.x * WORKGROUP_SIZE.x, group_count.y * WORKGROUP_SIZE.y);
+    let index = id.x + id.y * size.x;
+    let scale = (if size.x < size.y { size.x } else { size.y }) as f64;
+    let c = DVec2::new(id.x as f64 + 0.5 - size.x as f64 * 0.5, id.y as f64 + 0.5 - size.y as f64 * 0.5) / (scale - 1.0) * 4.0;
     let v = mandelbrot::mandelbrot_value(params.pos + c / params.zoom);
 
     // Gradient: black - red - yellow - white

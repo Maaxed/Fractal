@@ -27,8 +27,9 @@ impl App
                 source: wgpu::util::make_spirv(SHADER_CODE),
             });
 		
+		let workgroup_size = glam::uvec2(16, 16);
     	let size = target.window.inner_size();
-    	let compute = crate::compute::Compute::new(&target, &shader_module, size);
+    	let compute = crate::compute::Compute::new(&target, &shader_module, workgroup_size, size);
 		
 		let render = crate::render::Render::new(&target, &shader_module, size);
 
@@ -177,12 +178,12 @@ impl App
 							{
 								MouseScrollDelta::LineDelta(_dx, dy) =>
 								{
-									self.zoom *= (*dy as f64).exp();
+									self.zoom *= (*dy as f64 * 0.5).exp();
 									self.target.window.request_redraw();
 								},
 								MouseScrollDelta::PixelDelta(delta) =>
 								{
-									self.zoom *= delta.y.exp();
+									self.zoom *= (delta.y * 0.5).exp();
 									self.target.window.request_redraw();
 								},
 							}

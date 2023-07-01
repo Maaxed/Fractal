@@ -11,6 +11,7 @@ pub struct Compute
 
 struct Fixed
 {
+    workgroup_size: glam::UVec2,
     compute_pipeline: ComputePipeline,
     bind_group_layout: wgpu::BindGroupLayout,
     params_buffer: Buffer,
@@ -25,7 +26,7 @@ struct Dynamic
 
 impl Fixed
 {
-    fn new(target: &Target, shader_module: &wgpu::ShaderModule) -> Self
+    fn new(target: &Target, shader_module: &wgpu::ShaderModule, workgroup_size: glam::UVec2) -> Self
     {
         let params_buffer = target.device.create_buffer(
             &wgpu::BufferDescriptor
@@ -87,6 +88,7 @@ impl Fixed
         
         Self
         {
+            workgroup_size,
             compute_pipeline,
             bind_group_layout,
             params_buffer,
@@ -100,8 +102,8 @@ impl Dynamic
     {
         let size = PhysicalSize
         {
-            width: wgpu::util::align_to(size.width, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / std::mem::size_of::<u32>() as u32),
-            height: size.height
+            width: wgpu::util::align_to(size.width, fixed.workgroup_size.x.max(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / std::mem::size_of::<u32>() as u32)),
+            height: wgpu::util::align_to(size.height, fixed.workgroup_size.y)
         };
         
         let mem_size = (size.width * size.height * std::mem::size_of::<u32>() as u32) as wgpu::BufferAddress;
@@ -145,9 +147,9 @@ impl Dynamic
 
 impl Compute
 {
-    pub fn new(target: &Target, shader_module: &wgpu::ShaderModule, size: PhysicalSize<u32>) -> Self
+    pub fn new(target: &Target, shader_module: &wgpu::ShaderModule, workgroup_size: glam::UVec2, size: PhysicalSize<u32>) -> Self
     {
-        let fixed = Fixed::new(target, shader_module);
+        let fixed = Fixed::new(target, shader_module, workgroup_size);
         let dynamic = Dynamic::new(target, &fixed, size);
 
         Self
@@ -177,7 +179,7 @@ impl Compute
         let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
         compute_pass.set_bind_group(0, &self.dynamic.bind_group, &[]);
         compute_pass.set_pipeline(&self.fixed.compute_pipeline);
-        compute_pass.dispatch_workgroups(self.dynamic.size.width, self.dynamic.size.height, 1);
+        compute_pass.dispatch_workgroups(self.dynamic.size.width / self.fixed.workgroup_size.x, self.dynamic.size.height / self.fixed.workgroup_size.y, 1);
     }
 
     pub fn set_params(

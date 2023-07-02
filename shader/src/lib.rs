@@ -28,7 +28,12 @@ pub fn compute_mandelbrot(
     let index = id.x + id.y * size.x;
     let scale = (if size.x < size.y { size.x } else { size.y }) as f64;
     let c = DVec2::new(id.x as f64 + 0.5 - size.x as f64 * 0.5, id.y as f64 + 0.5 - size.y as f64 * 0.5) / (scale - 1.0) * 4.0;
-    let v = mandelbrot::mandelbrot_value(params.pos + c * params.zoom);
+    let pos = params.pos + c * params.zoom;
+    let v = match params.fractal_kind
+    {
+        fractal_renderer_shared::FractalKind::MandelbrotSet => mandelbrot::mandelbrot_value(pos),
+        fractal_renderer_shared::FractalKind::JuliaSet => mandelbrot::mandelbrot_julia_set(pos, params.secondary_pos),
+    };
 
     // Gradient: black - red - yellow - white
     let threshold1 = 0.2;

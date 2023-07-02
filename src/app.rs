@@ -1,4 +1,5 @@
-use glam::{DVec2, dvec2};
+use fractal_renderer_shared::FractalKind;
+use glam::dvec2;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseScrollDelta, MouseButton};
@@ -10,10 +11,10 @@ pub struct App
 	target: crate::Target,
 	render: crate::render::Render,
 	compute: crate::compute::Compute,
-	zoom: f64,
-	pos: DVec2,
+	fractal_params: fractal_renderer_shared::ComputeParams,
 	prev_mouse_pos: Option<PhysicalPosition<f64>>,
-	mouse_down: bool
+	mouse_left_down: bool,
+	mouse_right_down: bool,
 }
 
 impl App
@@ -38,10 +39,10 @@ impl App
 			target,
 			render,
 			compute,
-			zoom: 1.0,
-			pos: DVec2::ZERO,
+			fractal_params: Default::default(),
 			prev_mouse_pos: None,
-			mouse_down: false
+			mouse_left_down: false,
+			mouse_right_down: false,
 		}
 	}
 
@@ -54,13 +55,20 @@ impl App
 
 	fn apply_zoom(&mut self, zoom_value: f64)
 	{
-		let old_zoom = self.zoom;
-		self.zoom *= (-zoom_value * 0.5).exp();
+		let old_zoom = self.fractal_params.zoom;
+		self.fractal_params.zoom *= (-zoom_value * 0.5).exp();
 
 		if let Some(mouse_pos) = self.prev_mouse_pos
 		{
-			self.pos += dvec2(mouse_pos.x - self.target.config.width as f64 * 0.5, mouse_pos.y - self.target.config.height as f64 * 0.5) * self.pixel_world_size() * (old_zoom - self.zoom);
+			self.fractal_params.pos += dvec2(mouse_pos.x - self.target.config.width as f64 * 0.5, mouse_pos.y - self.target.config.height as f64 * 0.5) * self.pixel_world_size() * (old_zoom - self.fractal_params.zoom);
 		}
+		
+		self.target.window.request_redraw();
+	}
+
+	fn set_fractal_kind(&mut self, fractal_kind: FractalKind)
+	{
+		self.fractal_params.fractal_kind = fractal_kind;
 		
 		self.target.window.request_redraw();
 	}
@@ -136,13 +144,7 @@ impl App
 
 	pub fn redraw(&self) -> Result<(), wgpu::SurfaceError>
 	{
-		self.compute.set_params(&self.target.queue,
-			&fractal_renderer_shared::ComputeParams
-			{
-				pos: self.pos,
-				zoom: self.zoom,
-				padding: 0.0,
-			});
+		self.compute.set_params(&self.target.queue, &self.fractal_params);
 		self.do_compute();
 		self.do_render()
 	}
@@ -185,11 +187,20 @@ impl App
 							input: KeyboardInput
 								{
 									state: ElementState::Pressed,
-									virtual_keycode: Some(VirtualKeyCode::Escape),
+									virtual_keycode: Some(keycode),
 									..
 								},
 							..
-						} => *control_flow = ControlFlow::Exit,
+						} =>
+						{
+							match keycode
+							{
+								VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
+								VirtualKeyCode::M => self.set_fractal_kind(FractalKind::MandelbrotSet),
+								VirtualKeyCode::J => self.set_fractal_kind(FractalKind::JuliaSet),
+								_ => {},
+							}
+						},
 						WindowEvent::MouseWheel { delta, .. } =>
 						{
 							match delta
@@ -204,17 +215,27 @@ impl App
 								},
 							}
 						},
-						WindowEvent::MouseInput { button: MouseButton::Left, state, ..} =>
+						WindowEvent::MouseInput { button, state, ..} =>
 						{
-							self.mouse_down = *state == ElementState::Pressed;
+							match button
+							{
+								MouseButton::Left => self.mouse_left_down = *state == ElementState::Pressed,
+								MouseButton::Right => self.mouse_right_down = *state == ElementState::Pressed,
+								_ => {},
+							}
 						},
 						WindowEvent::CursorMoved { position, .. } =>
 						{
-							if self.mouse_down
+							if let Some(prev_pos) = self.prev_mouse_pos
 							{
-								if let Some(prev_pos) = self.prev_mouse_pos
+								if self.mouse_left_down
 								{
-									self.pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.zoom;
+									self.fractal_params.pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.fractal_params.zoom;
+									self.target.window.request_redraw();
+								}
+								else if self.mouse_right_down
+								{
+									self.fractal_params.secondary_pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.fractal_params.zoom;
 									self.target.window.request_redraw();
 								}
 							}

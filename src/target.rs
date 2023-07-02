@@ -14,7 +14,8 @@ impl Target
 {
 	pub async fn new(event_loop: &EventLoopWindowTarget<()>) -> Self
 	{
-    	let window = Window::new(event_loop).expect("Failed to create window");
+    	let window: Window = Window::new(event_loop).expect("Failed to create window");
+		window.set_title("Fractal");
 
 		let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::PRIMARY);
 		let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();

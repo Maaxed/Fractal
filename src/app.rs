@@ -49,9 +49,11 @@ impl App
 
     fn resize(&mut self, new_size: PhysicalSize<u32>)
 	{
-		self.target.resize(new_size);
-		self.compute.resize(&self.target, new_size);
-		self.render.resize(&self.target, new_size);
+		if self.target.resize(new_size)
+		{
+			self.compute.resize(&self.target, new_size);
+			self.render.resize(&self.target, new_size);
+		}
     }
 
 	fn apply_zoom(&mut self, zoom_value: f64)

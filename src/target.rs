@@ -74,13 +74,21 @@ impl Target
 		self.surface.configure(&self.device, &self.config);
 	}
 
-	pub fn resize(&mut self, new_size: PhysicalSize<u32>)
+	pub fn resize(&mut self, new_size: PhysicalSize<u32>) -> bool
 	{
-		if new_size.width > 0 && new_size.height > 0 && (new_size.width != self.config.width || new_size.height != self.config.height)
+		if new_size.width <= 0 || new_size.height <= 0
 		{
-			self.config.width = new_size.width;
-			self.config.height = new_size.height;
-			self.configure_surface();
+			return false;
 		}
+
+		if new_size.width == self.config.width && new_size.height == self.config.height
+		{
+			return false;
+		}
+
+		self.config.width = new_size.width;
+		self.config.height = new_size.height;
+		self.configure_surface();
+		true
 	}
 }

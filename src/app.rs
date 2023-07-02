@@ -199,6 +199,9 @@ impl App
 								VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
 								VirtualKeyCode::M => self.set_fractal_kind(FractalKind::MandelbrotSet),
 								VirtualKeyCode::J => self.set_fractal_kind(FractalKind::JuliaSet),
+								VirtualKeyCode::Key3 | VirtualKeyCode::Comma => self.set_fractal_kind(FractalKind::Multibrot3),
+								VirtualKeyCode::T => self.set_fractal_kind(FractalKind::Tricorn),
+								VirtualKeyCode::S => self.set_fractal_kind(FractalKind::BurningShip),
 								_ => {},
 							}
 						},

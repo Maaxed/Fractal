@@ -45,12 +45,30 @@ impl App
 		}
 	}
 
-    pub fn resize(&mut self, new_size: PhysicalSize<u32>)
+    fn resize(&mut self, new_size: PhysicalSize<u32>)
 	{
 		self.target.resize(new_size);
 		self.compute.resize(&self.target, new_size);
 		self.render.resize(&self.target, new_size);
     }
+
+	fn apply_zoom(&mut self, zoom_value: f64)
+	{
+		let old_zoom = self.zoom;
+		self.zoom *= (-zoom_value * 0.5).exp();
+
+		if let Some(mouse_pos) = self.prev_mouse_pos
+		{
+			self.pos += dvec2(mouse_pos.x - self.target.config.width as f64 * 0.5, mouse_pos.y - self.target.config.height as f64 * 0.5) * self.pixel_world_size() * (old_zoom - self.zoom);
+		}
+		
+		self.target.window.request_redraw();
+	}
+
+	fn pixel_world_size(&self) -> f64
+	{
+		4.0 / (self.target.config.width.min(self.target.config.height) as f64 - 1.0)
+	}
 
 	pub fn do_print_compute(&self)
 	{
@@ -178,13 +196,11 @@ impl App
 							{
 								MouseScrollDelta::LineDelta(_dx, dy) =>
 								{
-									self.zoom *= (*dy as f64 * 0.5).exp();
-									self.target.window.request_redraw();
+									self.apply_zoom(*dy as f64);
 								},
 								MouseScrollDelta::PixelDelta(delta) =>
 								{
-									self.zoom *= (delta.y * 0.5).exp();
-									self.target.window.request_redraw();
+									self.apply_zoom(delta.y * 10.0);
 								},
 							}
 						},
@@ -198,7 +214,7 @@ impl App
 							{
 								if let Some(prev_pos) = self.prev_mouse_pos
 								{
-									self.pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * 0.006 / self.zoom;
+									self.pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.zoom;
 									self.target.window.request_redraw();
 								}
 							}

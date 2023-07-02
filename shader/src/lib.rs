@@ -28,7 +28,7 @@ pub fn compute_mandelbrot(
     let index = id.x + id.y * size.x;
     let scale = (if size.x < size.y { size.x } else { size.y }) as f64;
     let c = DVec2::new(id.x as f64 + 0.5 - size.x as f64 * 0.5, id.y as f64 + 0.5 - size.y as f64 * 0.5) / (scale - 1.0) * 4.0;
-    let v = mandelbrot::mandelbrot_value(params.pos + c / params.zoom);
+    let v = mandelbrot::mandelbrot_value(params.pos + c * params.zoom);
 
     // Gradient: black - red - yellow - white
     let threshold1 = 0.2;

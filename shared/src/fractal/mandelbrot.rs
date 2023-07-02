@@ -1,4 +1,4 @@
-use spirv_std::glam::DVec2;
+use glam::DVec2;
 use crate::complex::Complex;
 
 const ITERATION_COUNT: u32 = 1024;

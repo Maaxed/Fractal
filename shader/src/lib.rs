@@ -1,9 +1,7 @@
 #![no_std]
 #![deny(warnings)]
 
-mod mandelbrot;
-mod complex;
-
+use fractal_renderer_shared as shared;
 use spirv_std::{spirv, Image, Sampler};
 use spirv_std::glam::{UVec3, DVec2, UVec2, Vec2, Vec4, vec4, vec2, uvec2};
 
@@ -18,7 +16,7 @@ pub fn compute_mandelbrot(
     // Inputs
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(num_workgroups)] group_count: UVec3,
-    #[spirv(uniform, descriptor_set = 0, binding = 0)] params : &fractal_renderer_shared::ComputeParams,
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] params : &shared::ComputeParams,
 
     // Outputs
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] output: &mut [u32],
@@ -29,11 +27,7 @@ pub fn compute_mandelbrot(
     let scale = (if size.x < size.y { size.x } else { size.y }) as f64;
     let c = DVec2::new(id.x as f64 + 0.5 - size.x as f64 * 0.5, id.y as f64 + 0.5 - size.y as f64 * 0.5) / (scale - 1.0) * 4.0;
     let pos = params.pos + c * params.zoom;
-    let v = match params.fractal_kind
-    {
-        fractal_renderer_shared::FractalKind::MandelbrotSet => mandelbrot::mandelbrot_value(pos),
-        fractal_renderer_shared::FractalKind::JuliaSet => mandelbrot::mandelbrot_julia_set(pos, params.secondary_pos),
-    };
+    let v = shared::fractal::compute_fractal_value(params.fractal_kind, pos, params.secondary_pos);
 
     // Gradient: black - red - yellow - white
     let threshold1 = 0.2;

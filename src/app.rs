@@ -1,4 +1,5 @@
-use fractal_renderer_shared::FractalKind;
+use fractal_renderer_shared as shared;
+use shared::fractal::FractalKind;
 use glam::dvec2;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event_loop::{EventLoop, ControlFlow};
@@ -11,7 +12,7 @@ pub struct App
 	target: crate::Target,
 	render: crate::render::Render,
 	compute: crate::compute::Compute,
-	fractal_params: fractal_renderer_shared::ComputeParams,
+	fractal_params: shared::ComputeParams,
 	prev_mouse_pos: Option<PhysicalPosition<f64>>,
 	mouse_left_down: bool,
 	mouse_right_down: bool,

@@ -1,4 +1,4 @@
-use spirv_std::glam::{DVec2, Vec2};
+use glam::{DVec2, Vec2};
 
 pub trait Complex
 {

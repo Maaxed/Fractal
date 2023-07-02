@@ -1,25 +1,23 @@
 #![no_std]
 
+pub mod complex;
+pub mod fractal;
+
 use glam::DVec2;
 #[cfg(feature = "bytemuck")]
 use bytemuck::NoUninit;
 
-#[repr(u32)]
-#[cfg_attr(feature = "bytemuck", derive(Debug, Copy, Clone, NoUninit))]
-pub enum FractalKind
-{
-    MandelbrotSet,
-    JuliaSet
-}
+
 
 #[repr(C)]
-#[cfg_attr(feature = "bytemuck", derive(Debug, Copy, Clone, NoUninit))]
+#[cfg_attr(feature = "bytemuck", derive(Debug, NoUninit))]
+#[derive(Copy, Clone)]
 pub struct ComputeParams
 {
     pub pos: DVec2,
     pub secondary_pos: DVec2,
     pub zoom: f64,
-    pub fractal_kind: FractalKind,
+    pub fractal_kind: fractal::FractalKind,
     pub padding: u32,
 }
 
@@ -32,7 +30,7 @@ impl Default for ComputeParams
             pos: DVec2::ZERO,
             secondary_pos: DVec2::ZERO,
             zoom: 1.0,
-            fractal_kind: FractalKind::MandelbrotSet,
+            fractal_kind: fractal::FractalKind::MandelbrotSet,
             padding: 0,
         }
     }

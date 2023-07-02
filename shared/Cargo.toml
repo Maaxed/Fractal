@@ -10,4 +10,5 @@ bytemuck = ["dep:bytemuck", "glam/bytemuck"]
 
 [dependencies]
 glam = { workspace = true, default-features = false }
+num-traits = { version = "0.2", default-features = false }
 bytemuck = { workspace = true, optional = true }

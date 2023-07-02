@@ -3,6 +3,7 @@ pub mod mandelbrot;
 pub mod multibrot;
 pub mod tricorn;
 pub mod burning_ship;
+pub mod cos_leaf;
 
 use glam::DVec2;
 #[cfg(feature = "bytemuck")]
@@ -18,6 +19,7 @@ pub enum FractalKind
     Multibrot3,
     Tricorn,
     BurningShip,
+    CosLeaf,
 }
 
 pub fn compute_fractal_value(fractal_kind: FractalKind, pos: DVec2, secondary_pos: DVec2) -> f32
@@ -29,5 +31,6 @@ pub fn compute_fractal_value(fractal_kind: FractalKind, pos: DVec2, secondary_po
         FractalKind::Multibrot3 => multibrot::multibrot3(pos),
         FractalKind::Tricorn => tricorn::tricorn(pos),
         FractalKind::BurningShip => burning_ship::burning_ship(pos),
+        FractalKind::CosLeaf => cos_leaf::cos_leaf(pos),
     }
 }

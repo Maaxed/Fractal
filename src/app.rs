@@ -205,6 +205,7 @@ impl App
 								VirtualKeyCode::T => self.set_fractal_kind(FractalKind::Tricorn),
 								VirtualKeyCode::S => self.set_fractal_kind(FractalKind::BurningShip),
 								VirtualKeyCode::C => self.set_fractal_kind(FractalKind::CosLeaf),
+								VirtualKeyCode::L => self.set_fractal_kind(FractalKind::Lyapunov),
 								_ => {},
 							}
 						},

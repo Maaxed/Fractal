@@ -2,12 +2,8 @@
 #![deny(warnings)]
 
 use fractal_renderer_shared as shared;
-use spirv_std::num_traits::Pow;
 use spirv_std::{spirv, Image, Sampler};
-use spirv_std::glam::{UVec3, DVec2, UVec2, Vec2, Vec4, vec4, vec2, uvec2};
-
-#[cfg(target_arch = "spirv")]
-use spirv_std::num_traits::Float;
+use spirv_std::glam::{UVec3, DVec2, UVec2, Vec2, Vec4, vec4, vec2, uvec2, dvec2};
 
 pub fn color_to_byte(color: f32) -> u32
 {
@@ -29,27 +25,12 @@ pub fn compute_mandelbrot(
     let size = uvec2(group_count.x * WORKGROUP_SIZE.x, group_count.y * WORKGROUP_SIZE.y);
     let index = id.x + id.y * size.x;
     let scale = (if size.x < size.y { size.x } else { size.y }) as f64;
+
     let c = DVec2::new(id.x as f64 + 0.5 - size.x as f64 * 0.5, id.y as f64 + 0.5 - size.y as f64 * 0.5) / (scale - 1.0) * 4.0;
-    let pos = params.pos + c * params.zoom;
-    let v = shared::fractal::compute_fractal_value(params.fractal_kind, pos, params.secondary_pos);
+    let pos = (params.pos + c * params.zoom) * dvec2(1.0, -1.0);
 
-    if params.fractal_kind == shared::fractal::FractalKind::Lyapunov
-    {
-        let y: f32 = if v >= 0.0 { 0.0 } else { v.exp().sqrt() };
-        let r = y;
-        let g = 1.0 - (1.0 - y).pow(0.55);
-        let b = if v <= 0.0 { 0.0 } else { 1.0 - (-v).exp().pow(3.0) };
-        output[index as usize] = (color_to_byte(r) << 16) | (color_to_byte(g) << 8) | color_to_byte(b) | 0xff000000;
-        return;
-    }
-
-    // Gradient: black - red - yellow - white
-    let threshold1 = 0.2;
-    let threshold2 = 0.6;
-    let r = if v > threshold1 { 1.0 } else { v / threshold1 };
-    let g = if v > threshold2 { 1.0 } else if v > threshold1 { (v - threshold1) / (threshold2 - threshold1) } else { 0.0 };
-    let b = if v > threshold2 { (v - threshold2) / (1.0 - threshold2) } else { 0.0 };
-    output[index as usize] = (color_to_byte(r) << 16) | (color_to_byte(g) << 8) | color_to_byte(b) | 0xff000000;
+    let color = shared::fractal::compute_fractal_color(params.fractal_kind, pos, params.secondary_pos);
+    output[index as usize] = (color_to_byte(color.x) << 16) | (color_to_byte(color.y) << 8) | color_to_byte(color.z) | 0xff000000;
 }
 
 

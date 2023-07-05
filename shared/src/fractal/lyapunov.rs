@@ -7,7 +7,7 @@ const ITERATION_COUNT: usize = 1024;
 
 pub fn lyapunov<const L: usize>(sequence: &[bool; L], pos: DVec2) -> f32
 {
-    if pos.x < 0.0 || -pos.y < 0.0 || pos.x > 4.0 || -pos.y > 4.0
+    if pos.x < 0.0 || pos.y < 0.0 || pos.x > 4.0 || pos.y > 4.0
     {
         return 0.0;
     }
@@ -17,7 +17,7 @@ pub fn lyapunov<const L: usize>(sequence: &[bool; L], pos: DVec2) -> f32
 
     for i in 0..ITERATION_COUNT
     {
-        let rn = if sequence[i % sequence.len()] { -pos.y } else { pos.x };
+        let rn = if sequence[i % sequence.len()] { pos.y } else { pos.x };
 
         if i != 0
         {

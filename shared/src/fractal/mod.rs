@@ -6,6 +6,7 @@ pub mod burning_ship;
 pub mod cos_leaf;
 pub mod lyapunov;
 
+use crate::FractalParams;
 use num_traits::Pow;
 use glam::{DVec2, Vec3, vec3};
 #[cfg(feature = "bytemuck")]
@@ -31,11 +32,11 @@ pub enum FractalKind
     Lyapunov,
 }
 
-pub fn compute_fractal_color(fractal_kind: FractalKind, pos: DVec2, secondary_pos: DVec2) -> Vec3
+pub fn compute_fractal_color(pos: DVec2, fractal_params: FractalParams) -> Vec3
 {
-    let v = compute_fractal_value(fractal_kind, pos, secondary_pos);
+    let v = compute_fractal_value(fractal_params.fractal_kind, pos, fractal_params.secondary_pos);
 
-    if fractal_kind == FractalKind::Lyapunov
+    if fractal_params.fractal_kind == FractalKind::Lyapunov
     {
         let y: f32 = if v >= 0.0 { 0.0 } else { v.exp().sqrt() };
         let r = y;

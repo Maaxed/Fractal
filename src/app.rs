@@ -1,6 +1,6 @@
 use fractal_renderer_shared as shared;
 use shared::fractal::FractalKind;
-use glam::dvec2;
+use glam::{dvec2, DVec2};
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseScrollDelta, MouseButton};
@@ -12,7 +12,9 @@ pub struct App
 	target: crate::Target,
 	render: crate::render::Render,
 	compute: crate::compute::Compute,
-	fractal_params: shared::ComputeParams,
+    pos: DVec2,
+    zoom: f64,
+	fractal_params: shared::FractalParams,
 	prev_mouse_pos: Option<PhysicalPosition<f64>>,
 	mouse_left_down: bool,
 	mouse_right_down: bool,
@@ -40,6 +42,8 @@ impl App
 			target,
 			render,
 			compute,
+			pos: DVec2::ZERO,
+			zoom: 1.0,
 			fractal_params: Default::default(),
 			prev_mouse_pos: None,
 			mouse_left_down: false,
@@ -58,12 +62,12 @@ impl App
 
 	fn apply_zoom(&mut self, zoom_value: f64)
 	{
-		let old_zoom = self.fractal_params.zoom;
-		self.fractal_params.zoom *= (-zoom_value * 0.5).exp();
+		let old_zoom = self.zoom;
+		self.zoom *= (-zoom_value * 0.5).exp();
 
 		if let Some(mouse_pos) = self.prev_mouse_pos
 		{
-			self.fractal_params.pos += dvec2(mouse_pos.x - self.target.config.width as f64 * 0.5, mouse_pos.y - self.target.config.height as f64 * 0.5) * self.pixel_world_size() * (old_zoom - self.fractal_params.zoom);
+			self.pos += dvec2(mouse_pos.x - self.target.config.width as f64 * 0.5, mouse_pos.y - self.target.config.height as f64 * 0.5) * self.pixel_world_size() * (old_zoom - self.zoom);
 		}
 		
 		self.target.window.request_redraw();
@@ -147,7 +151,15 @@ impl App
 
 	pub fn redraw(&self) -> Result<(), wgpu::SurfaceError>
 	{
-		self.compute.set_params(&self.target.queue, &self.fractal_params);
+		let size = self.compute.size();
+		let scale = (if size.width < size.height { size.width } else { size.height }) as f64;
+		let c = 2.0 * dvec2(size.width as f64, size.height as f64) / scale;
+		self.compute.set_params(&self.target.queue, &shared::ComputeParams
+		{
+			min_pos: (self.pos - c * self.zoom) * dvec2(1.0, -1.0),
+			max_pos: (self.pos + c * self.zoom) * dvec2(1.0, -1.0),
+			fractal: self.fractal_params,
+		});
 		self.do_compute();
 		self.do_render()
 	}
@@ -238,12 +250,12 @@ impl App
 							{
 								if self.mouse_left_down
 								{
-									self.fractal_params.pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.fractal_params.zoom;
+									self.pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.zoom;
 									self.target.window.request_redraw();
 								}
 								else if self.mouse_right_down
 								{
-									self.fractal_params.secondary_pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.fractal_params.zoom;
+									self.fractal_params.secondary_pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.zoom;
 									self.target.window.request_redraw();
 								}
 							}

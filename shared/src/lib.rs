@@ -15,11 +15,21 @@ use bytemuck::NoUninit;
 #[derive(Copy, Clone)]
 pub struct ComputeParams
 {
-    pub pos: DVec2,
+    pub min_pos: DVec2,
+    pub max_pos: DVec2,
+    pub fractal: FractalParams,
+}
+
+#[repr(C)]
+#[cfg_attr(feature = "bytemuck", derive(Debug, NoUninit))]
+#[derive(Copy, Clone)]
+pub struct FractalParams
+{
     pub secondary_pos: DVec2,
-    pub zoom: f64,
     pub fractal_kind: fractal::FractalKind,
-    pub padding: u32,
+    padding0: u32,
+    padding1: u32,
+    padding2: u32,
 }
 
 impl Default for ComputeParams
@@ -28,11 +38,24 @@ impl Default for ComputeParams
     {
         Self
         {
-            pos: DVec2::ZERO,
+            min_pos: DVec2::splat(-2.0),
+            max_pos: DVec2::splat(2.0),
+            fractal: FractalParams::default(),
+        }
+    }
+}
+
+impl Default for FractalParams
+{
+    fn default() -> Self
+    {
+        Self
+        {
             secondary_pos: DVec2::ZERO,
-            zoom: 1.0,
             fractal_kind: fractal::FractalKind::MandelbrotSet,
-            padding: 0,
+            padding0: Default::default(),
+            padding1: Default::default(),
+            padding2: Default::default(),
         }
     }
 }

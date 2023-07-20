@@ -6,9 +6,9 @@ pub mod burning_ship;
 pub mod cos_leaf;
 pub mod lyapunov;
 
-use crate::FractalParams;
+use crate::{FractalParams, complex::Complex};
 use num_traits::Pow;
-use glam::{DVec2, Vec3, vec3};
+use glam::{Vec3, vec3};
 #[cfg(feature = "bytemuck")]
 use bytemuck::NoUninit;
 
@@ -32,7 +32,7 @@ pub enum FractalKind
     Lyapunov,
 }
 
-pub fn compute_fractal_color(pos: DVec2, fractal_params: FractalParams) -> Vec3
+pub fn compute_fractal_color(pos: Complex, fractal_params: FractalParams) -> Vec3
 {
     let v = compute_fractal_value(fractal_params.fractal_kind, pos, fractal_params.secondary_pos);
 
@@ -54,7 +54,7 @@ pub fn compute_fractal_color(pos: DVec2, fractal_params: FractalParams) -> Vec3
     vec3(r, g, b)
 }
 
-pub fn compute_fractal_value(fractal_kind: FractalKind, pos: DVec2, secondary_pos: DVec2) -> f32
+pub fn compute_fractal_value(fractal_kind: FractalKind, pos: Complex, secondary_pos: Complex) -> f32
 {
     match fractal_kind
     {
@@ -64,6 +64,6 @@ pub fn compute_fractal_value(fractal_kind: FractalKind, pos: DVec2, secondary_po
         FractalKind::Tricorn => tricorn::tricorn(pos),
         FractalKind::BurningShip => burning_ship::burning_ship(pos),
         FractalKind::CosLeaf => cos_leaf::cos_leaf(pos),
-        FractalKind::Lyapunov => lyapunov::lyapunov(&[false, true], pos),
+        FractalKind::Lyapunov => lyapunov::lyapunov(&[false, true], pos.into()),
     }
 }

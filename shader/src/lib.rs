@@ -28,7 +28,7 @@ pub fn compute_mandelbrot(
     let c = DVec2::new(id.x as f64 + 0.5, id.y as f64 + 0.5) / size.as_dvec2();
     let pos = params.min_pos + c * (params.max_pos - params.min_pos);
 
-    let color = shared::fractal::compute_fractal_color(pos, params.fractal);
+    let color = shared::fractal::compute_fractal_color(pos.into(), params.fractal);
     output[index as usize] = (color_to_byte(color.x) << 16) | (color_to_byte(color.y) << 8) | color_to_byte(color.z) | 0xff000000;
 }
 

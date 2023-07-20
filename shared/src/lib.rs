@@ -4,6 +4,7 @@
 pub mod complex;
 pub mod fractal;
 
+use complex::Complex;
 use glam::DVec2;
 #[cfg(feature = "bytemuck")]
 use bytemuck::NoUninit;
@@ -25,7 +26,7 @@ pub struct ComputeParams
 #[derive(Copy, Clone)]
 pub struct FractalParams
 {
-    pub secondary_pos: DVec2,
+    pub secondary_pos: Complex,
     pub fractal_kind: fractal::FractalKind,
     padding0: u32,
     padding1: u32,
@@ -51,7 +52,7 @@ impl Default for FractalParams
     {
         Self
         {
-            secondary_pos: DVec2::ZERO,
+            secondary_pos: Complex::ZERO,
             fractal_kind: fractal::FractalKind::MandelbrotSet,
             padding0: Default::default(),
             padding1: Default::default(),

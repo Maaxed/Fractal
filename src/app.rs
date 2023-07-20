@@ -1,4 +1,5 @@
 use fractal_renderer_shared as shared;
+use shared::complex::Complex;
 use shared::fractal::FractalKind;
 use glam::{dvec2, DVec2};
 use winit::dpi::{PhysicalPosition, PhysicalSize};
@@ -213,7 +214,7 @@ impl App
 								VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
 								VirtualKeyCode::M => self.set_fractal_kind(FractalKind::MandelbrotSet),
 								VirtualKeyCode::J => self.set_fractal_kind(FractalKind::JuliaSet),
-								VirtualKeyCode::Key3 | VirtualKeyCode::Comma => self.set_fractal_kind(FractalKind::Multibrot3),
+								VirtualKeyCode::Comma | VirtualKeyCode::Key3 | VirtualKeyCode::Numpad3 => self.set_fractal_kind(FractalKind::Multibrot3),
 								VirtualKeyCode::T => self.set_fractal_kind(FractalKind::Tricorn),
 								VirtualKeyCode::S => self.set_fractal_kind(FractalKind::BurningShip),
 								VirtualKeyCode::C => self.set_fractal_kind(FractalKind::CosLeaf),
@@ -255,7 +256,7 @@ impl App
 								}
 								else if self.mouse_right_down
 								{
-									self.fractal_params.secondary_pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.zoom;
+									self.fractal_params.secondary_pos -= Complex::new(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.zoom;
 									self.target.window.request_redraw();
 								}
 							}

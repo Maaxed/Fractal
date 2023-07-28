@@ -35,18 +35,19 @@ pub fn compute_mandelbrot(
 
 const VERTICES: [(Vec2, Vec2); 6] =
 [
-	(vec2(-1.0, -1.0), vec2(0.0, 1.0)),
-	(vec2( 1.0, -1.0), vec2(1.0, 1.0)),
-	(vec2(-1.0,  1.0), vec2(0.0, 0.0)),
-	(vec2(-1.0,  1.0), vec2(0.0, 0.0)),
-	(vec2( 1.0, -1.0), vec2(1.0, 1.0)),
-	(vec2( 1.0,  1.0), vec2(1.0, 0.0)),
+	(vec2(0.0, 0.0), vec2(0.0, 1.0)),
+	(vec2(1.0, 0.0), vec2(1.0, 1.0)),
+	(vec2(0.0, 1.0), vec2(0.0, 0.0)),
+	(vec2(0.0, 1.0), vec2(0.0, 0.0)),
+	(vec2(1.0, 0.0), vec2(1.0, 1.0)),
+	(vec2(1.0, 1.0), vec2(1.0, 0.0)),
 ];
 
 #[spirv(vertex)]
 pub fn vertex(
     // Inputs
     #[spirv(vertex_index)] vertex_id: i32,
+    #[spirv(uniform, descriptor_set = 0, binding = 2)] uniforms: &shared::RenderUniforms,
 
     // Outputs
 	#[spirv(position)] output_pos: &mut Vec4,
@@ -54,6 +55,8 @@ pub fn vertex(
 )
 {
 	let (pos, uv) = VERTICES[vertex_id as usize];
+
+    let pos = ((pos.as_dvec2() - uniforms.pos) * uniforms.scale).as_vec2();
     
     *output_pos = vec4(
         pos.x,

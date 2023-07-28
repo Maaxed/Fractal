@@ -1,7 +1,7 @@
 
 # Fractal
 
-A fractal generator running on you gpu, 100% written in rust
+A fractal generator running on your gpu, 100% written in rust
 
 
 ## How to run the code

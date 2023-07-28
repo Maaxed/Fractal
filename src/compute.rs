@@ -98,12 +98,12 @@ impl Fixed
 
 impl Dynamic
 {
-    fn new(target: &Target, fixed: &Fixed, size: PhysicalSize<u32>) -> Self
+    fn new(target: &Target, fixed: &Fixed, texture_size: PhysicalSize<u32>) -> Self
     {
         let size = PhysicalSize
         {
-            width: wgpu::util::align_to(size.width, fixed.workgroup_size.x.max(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / std::mem::size_of::<u32>() as u32)),
-            height: wgpu::util::align_to(size.height, fixed.workgroup_size.y)
+            width: wgpu::util::align_to(texture_size.width, fixed.workgroup_size.x.max(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / std::mem::size_of::<u32>() as u32)),
+            height: wgpu::util::align_to(texture_size.height, fixed.workgroup_size.y)
         };
         
         let mem_size = (size.width * size.height * std::mem::size_of::<u32>() as u32) as wgpu::BufferAddress;
@@ -147,10 +147,10 @@ impl Dynamic
 
 impl Compute
 {
-    pub fn new(target: &Target, shader_module: &wgpu::ShaderModule, workgroup_size: glam::UVec2, size: PhysicalSize<u32>) -> Self
+    pub fn new(target: &Target, shader_module: &wgpu::ShaderModule, workgroup_size: glam::UVec2, texture_size: PhysicalSize<u32>) -> Self
     {
         let fixed = Fixed::new(target, shader_module, workgroup_size);
-        let dynamic = Dynamic::new(target, &fixed, size);
+        let dynamic = Dynamic::new(target, &fixed, texture_size);
 
         Self
         {

@@ -12,6 +12,7 @@ struct Fixed
     render_pipeline: wgpu::RenderPipeline,
     bind_group_layout: wgpu::BindGroupLayout,
     fractal_sampler: wgpu::Sampler,
+    uniform_buffer: wgpu::Buffer,
 }
 
 struct Dynamic
@@ -24,6 +25,15 @@ impl Fixed
 {
     fn new(target: &crate::Target, shader_module: &wgpu::ShaderModule) -> Self
     {
+        let uniform_buffer = target.device.create_buffer(
+            &wgpu::BufferDescriptor
+            {
+                label: Some("uniforms"),
+                size: std::mem::size_of::<fractal_renderer_shared::RenderUniforms>() as u64,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+
         let fractal_sampler = target.device.create_sampler(
             &wgpu::SamplerDescriptor
             {
@@ -57,6 +67,18 @@ impl Fixed
                         // corresponding Texture entry above.
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry
+                    {
+                        binding: 2,
+                        count: None,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer
+                        {
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                            ty: wgpu::BufferBindingType::Uniform,
+                        },
                     },
                 ],
             });
@@ -97,13 +119,14 @@ impl Fixed
             fractal_sampler,
             bind_group_layout,
             render_pipeline,
+            uniform_buffer,
         }
     }
 }
 
 impl Dynamic
 {
-    fn new(target: &crate::Target, fixed: &Fixed, size: PhysicalSize<u32>) -> Self
+    fn new(target: &crate::Target, fixed: &Fixed, texture_size: PhysicalSize<u32>) -> Self
     {
 		let fractal_texture = target.device.create_texture(
 			&wgpu::TextureDescriptor
@@ -111,8 +134,8 @@ impl Dynamic
 				label: Some("fractal_texture"),
 				size: wgpu::Extent3d
 				{
-					width: size.width,
-					height: size.height,
+					width: texture_size.width,
+					height: texture_size.height,
 					depth_or_array_layers: 1,
 				},
 				mip_level_count: 1,
@@ -141,7 +164,12 @@ impl Dynamic
                     {
                         binding: 1,
                         resource: wgpu::BindingResource::Sampler(&fixed.fractal_sampler),
-                    }
+                    },
+                    wgpu::BindGroupEntry
+                    {
+                        binding: 2,
+                        resource: fixed.uniform_buffer.as_entire_binding(),
+                    },
                 ],
             });
 
@@ -155,10 +183,10 @@ impl Dynamic
 
 impl Render
 {
-    pub fn new(target: &crate::Target, shader_module: &wgpu::ShaderModule, size: PhysicalSize<u32>) -> Self
+    pub fn new(target: &crate::Target, shader_module: &wgpu::ShaderModule, texture_size: PhysicalSize<u32>) -> Self
     {
 		let fixed = Fixed::new(target, shader_module);
-        let dynamic = Dynamic::new(target, &fixed, size);
+        let dynamic = Dynamic::new(target, &fixed, texture_size);
 
         Self
         {
@@ -199,5 +227,14 @@ impl Render
         render_pass.set_pipeline(&self.fixed.render_pipeline);
         render_pass.set_bind_group(0, &self.dynamic.bind_group, &[]);
         render_pass.draw(0..6, 0..1);
+    }
+
+    pub fn set_params(
+        &self,
+        queue: &wgpu::Queue,
+        params: &fractal_renderer_shared::RenderUniforms
+    )
+    {
+        queue.write_buffer(&self.fixed.uniform_buffer, 0, bytemuck::bytes_of(params));
     }
 }

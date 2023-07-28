@@ -6,7 +6,7 @@ pub mod burning_ship;
 pub mod cos_leaf;
 pub mod lyapunov;
 
-use crate::{FractalParams, complex::Complex};
+use crate::complex::Complex;
 use num_traits::Pow;
 use glam::{Vec3, vec3};
 #[cfg(feature = "bytemuck")]
@@ -30,6 +30,33 @@ pub enum FractalKind
 
     // Other
     Lyapunov,
+}
+
+#[repr(C)]
+#[cfg_attr(feature = "bytemuck", derive(Debug, NoUninit))]
+#[derive(Copy, Clone)]
+pub struct FractalParams
+{
+    pub secondary_pos: Complex,
+    pub fractal_kind: FractalKind,
+    padding0: u32,
+    padding1: u32,
+    padding2: u32,
+}
+
+impl Default for FractalParams
+{
+    fn default() -> Self
+    {
+        Self
+        {
+            secondary_pos: Complex::ZERO,
+            fractal_kind: FractalKind::MandelbrotSet,
+            padding0: Default::default(),
+            padding1: Default::default(),
+            padding2: Default::default(),
+        }
+    }
 }
 
 pub fn compute_fractal_color(pos: Complex, fractal_params: FractalParams) -> Vec3

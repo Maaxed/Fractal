@@ -15,7 +15,7 @@ pub struct App
 	compute: crate::compute::Compute,
     pos: DVec2,
     zoom: f64,
-	fractal_params: shared::FractalParams,
+	fractal_params: shared::fractal::FractalParams,
 	prev_mouse_pos: Option<PhysicalPosition<f64>>,
 	mouse_left_down: bool,
 	mouse_right_down: bool,
@@ -33,10 +33,10 @@ impl App
             });
 		
 		let workgroup_size = glam::uvec2(16, 16);
-    	let size = target.window.inner_size();
-    	let compute = crate::compute::Compute::new(&target, &shader_module, workgroup_size, size);
+		let cell_size = PhysicalSize::new(256, 256);
+    	let compute = crate::compute::Compute::new(&target, &shader_module, workgroup_size, cell_size);
 		
-		let render = crate::render::Render::new(&target, &shader_module, size);
+		let render = crate::render::Render::new(&target, &shader_module, cell_size);
 
 		Self
 		{
@@ -54,11 +54,7 @@ impl App
 
     fn resize(&mut self, new_size: PhysicalSize<u32>)
 	{
-		if self.target.resize(new_size)
-		{
-			self.compute.resize(&self.target, new_size);
-			self.render.resize(&self.target, new_size);
-		}
+		self.target.resize(new_size);
     }
 
 	fn apply_zoom(&mut self, zoom_value: f64)
@@ -68,7 +64,7 @@ impl App
 
 		if let Some(mouse_pos) = self.prev_mouse_pos
 		{
-			self.pos += dvec2(mouse_pos.x - self.target.config.width as f64 * 0.5, mouse_pos.y - self.target.config.height as f64 * 0.5) * self.pixel_world_size() * (old_zoom - self.zoom);
+			self.pos += dvec2(mouse_pos.x - self.target.config.width as f64 * 0.5, self.target.config.height as f64 * 0.5 - mouse_pos.y) * self.pixel_world_size() * (old_zoom - self.zoom);
 		}
 		
 		self.target.window.request_redraw();
@@ -84,44 +80,6 @@ impl App
 	fn pixel_world_size(&self) -> f64
 	{
 		4.0 / (self.target.config.width.min(self.target.config.height) as f64 - 1.0)
-	}
-
-	pub fn do_print_compute(&self)
-	{
-		let readback_buffer = self.target.device.create_buffer(
-        &wgpu::BufferDescriptor
-        {
-            label: None,
-            size: self.compute.buffer().size(),
-            // Can be read to the CPU, and can be copied from the shader's storage buffer
-            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-    
-		let mut commands = self.target.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
-		self.compute.make_compute_pass(&mut commands);
-
-		self.compute.copy_buffer(&mut commands, &readback_buffer, 0);
-		
-		self.target.queue.submit(std::iter::once(commands.finish()));
-
-		let buffer_slice = readback_buffer.slice(..);
-		buffer_slice.map_async(wgpu::MapMode::Read, |r| r.unwrap());
-		self.target.device.poll(wgpu::Maintain::Wait);
-
-		let result = self.compute.read_buffer(&buffer_slice.get_mapped_range());
-
-		for line in result.chunks_exact(self.compute.size().width as usize)
-		{
-			for c in line
-			{
-				print!("{c:>3}");
-			}
-			println!();
-		}
-		
-		readback_buffer.unmap();
 	}
 
 	pub fn do_compute(&self)
@@ -152,15 +110,22 @@ impl App
 
 	pub fn redraw(&self) -> Result<(), wgpu::SurfaceError>
 	{
-		let size = self.compute.size();
+		let size = self.target.window.inner_size();
 		let scale = (if size.width < size.height { size.width } else { size.height }) as f64;
-		let c = 2.0 * dvec2(size.width as f64, size.height as f64) / scale;
+		let scale = scale / (2.0 * dvec2(size.width as f64, size.height as f64) * self.zoom);
+
 		self.compute.set_params(&self.target.queue, &shared::ComputeParams
 		{
-			min_pos: (self.pos - c * self.zoom) * dvec2(1.0, -1.0),
-			max_pos: (self.pos + c * self.zoom) * dvec2(1.0, -1.0),
+			min_pos: dvec2(0.0, 1.0),
+			max_pos: dvec2(1.0, 0.0),
 			fractal: self.fractal_params,
 		});
+		self.render.set_params(&self.target.queue, &shared::RenderUniforms
+		{
+			pos: self.pos,
+			scale: scale,
+		});
+
 		self.do_compute();
 		self.do_render()
 	}
@@ -251,7 +216,7 @@ impl App
 							{
 								if self.mouse_left_down
 								{
-									self.pos -= dvec2(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.zoom;
+									self.pos -= dvec2(position.x - prev_pos.x, prev_pos.y - position.y) * self.pixel_world_size() * self.zoom;
 									self.target.window.request_redraw();
 								}
 								else if self.mouse_right_down

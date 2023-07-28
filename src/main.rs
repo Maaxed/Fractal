@@ -2,6 +2,7 @@ mod target;
 mod compute;
 mod render;
 mod app;
+mod quad_cell;
 
 pub use target::Target;
 pub use app::App;

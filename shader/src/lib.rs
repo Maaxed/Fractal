@@ -3,7 +3,7 @@
 
 use fractal_renderer_shared as shared;
 use spirv_std::{spirv, Image, Sampler};
-use spirv_std::glam::{UVec3, DVec2, UVec2, Vec2, Vec4, vec4, vec2, uvec2};
+use spirv_std::glam::{UVec3, DVec2, UVec2, Vec2, Vec4, vec2, uvec2};
 
 pub fn color_to_byte(color: f32) -> u32
 {
@@ -47,23 +47,19 @@ const VERTICES: [(Vec2, Vec2); 6] =
 pub fn vertex(
     // Inputs
     #[spirv(vertex_index)] vertex_id: i32,
-    #[spirv(uniform, descriptor_set = 0, binding = 2)] uniforms: &shared::RenderUniforms,
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] uniforms: &shared::render::Uniforms,
+    #[spirv(uniform, descriptor_set = 1, binding = 0)] instance: &shared::render::Instance,
 
     // Outputs
 	#[spirv(position)] output_pos: &mut Vec4,
     output_uv: &mut Vec2,
 )
 {
-	let (pos, uv) = VERTICES[vertex_id as usize];
+	let (corner_pos, uv) = VERTICES[vertex_id as usize];
 
-    let pos = ((pos.as_dvec2() - uniforms.pos) * uniforms.scale).as_vec2();
+    let pos = ((instance.pos + corner_pos.as_dvec2() * instance.size - uniforms.camera_pos) * uniforms.world_to_view_scale).as_vec2();
     
-    *output_pos = vec4(
-        pos.x,
-        pos.y,
-        0.0,
-        1.0,
-    );
+    *output_pos = (pos, 0.0, 1.0).into();
 
     *output_uv = uv;
 }
@@ -78,8 +74,8 @@ pub fn fragment(
     output_color: &mut Vec4,
 
     // Uniforms
-    #[spirv(descriptor_set = 0, binding = 0)] fractal_texture: &Image!(2D, type=f32, sampled=true),
     #[spirv(descriptor_set = 0, binding = 1)] sampler: &Sampler,
+    #[spirv(descriptor_set = 1, binding = 1)] fractal_texture: &Image!(2D, type=f32, sampled=true),
 )
 {
     *output_color = fractal_texture.sample(*sampler, input_uv);

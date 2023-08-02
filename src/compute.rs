@@ -1,4 +1,4 @@
-use wgpu::{ComputePipeline, Buffer, BindGroup, CommandEncoder, BufferAddress, BufferView};
+use wgpu::{ComputePipeline, Buffer, BindGroup, CommandEncoder};
 use winit::dpi::PhysicalSize;
 
 use crate::Target;
@@ -159,19 +159,9 @@ impl Compute
         }
     }
 
-    pub fn resize(&mut self, target: &crate::Target, new_size: PhysicalSize<u32>)
-	{
-        self.dynamic = Dynamic::new(target, &self.fixed, new_size);
-    }
-
     pub fn buffer(&self) -> &Buffer
     {
         &self.dynamic.output_buffer
-    }
-
-    pub fn size(&self) -> PhysicalSize<u32>
-    {
-        self.dynamic.size
     }
 
     pub fn make_compute_pass(&self, commands: &mut CommandEncoder)
@@ -189,22 +179,6 @@ impl Compute
     )
     {
         queue.write_buffer(&self.fixed.params_buffer, 0, bytemuck::bytes_of(params));
-    }
-
-    pub fn copy_buffer(
-        &self,
-        commands: &mut CommandEncoder,
-        destination: &Buffer,
-        destination_offset: BufferAddress,
-    )
-    {
-        commands.copy_buffer_to_buffer(
-            self.buffer(),
-            0,
-            destination,
-            destination_offset,
-            self.buffer().size(),
-        );
     }
 
     pub fn copy_buffer_to_texture(
@@ -233,13 +207,5 @@ impl Compute
             },
             destination.size()
         );
-    }
-
-    pub fn read_buffer(&self, buffer: &BufferView) -> Vec<u32>
-    {
-        buffer
-            .chunks_exact(4)
-            .map(|bytes| u32::from_ne_bytes(bytes.try_into().unwrap()))
-            .collect::<Vec<_>>()
     }
 }

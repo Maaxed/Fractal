@@ -6,6 +6,8 @@ use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseScrollDelta, MouseButton};
 
+use crate::quad_cell::QuadPos;
+
 const SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader.spv"));
 
 pub struct App
@@ -82,7 +84,7 @@ impl App
 		4.0 / (self.target.config.width.min(self.target.config.height) as f64 - 1.0)
 	}
 
-	pub fn do_compute(&self)
+	fn do_compute(&self)
 	{
 		let mut commands = self.target.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
@@ -93,7 +95,7 @@ impl App
 		self.target.queue.submit(std::iter::once(commands.finish()));
 	}
 
-	pub fn do_render(&self) -> Result<(), wgpu::SurfaceError>
+	fn do_render(&self) -> Result<(), wgpu::SurfaceError>
 	{
 		let output = self.target.surface.get_current_texture()?;
 		let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -110,24 +112,53 @@ impl App
 
 	pub fn redraw(&self) -> Result<(), wgpu::SurfaceError>
 	{
-		let size = self.target.window.inner_size();
-		let scale = (if size.width < size.height { size.width } else { size.height }) as f64;
-		let scale = scale / (2.0 * dvec2(size.width as f64, size.height as f64) * self.zoom);
+		// Parameters
+		let window_size = self.target.window.inner_size();
+		let ratio = (if window_size.width < window_size.height { window_size.width } else { window_size.height }) as f64;
+		let scale = ratio / (2.0 * dvec2(window_size.width as f64, window_size.height as f64) * self.zoom);
+
+		let exponent = self.zoom.log2().round() as i32 + 1;
+		let quad_pos = QuadPos { unscaled_pos: (self.pos * 2.0_f64.powi(-exponent)).floor().as_i64vec2(), exponent };
+
+		let cell_size = quad_pos.cell_size();
+		let cell_pos = quad_pos.cell_bottom_left();
 
 		self.compute.set_params(&self.target.queue, &shared::ComputeParams
 		{
-			min_pos: dvec2(0.0, 1.0),
-			max_pos: dvec2(1.0, 0.0),
+			min_pos: cell_pos + dvec2(0.0, cell_size),
+			max_pos: cell_pos + dvec2(cell_size, 0.0),
 			fractal: self.fractal_params,
 		});
-		self.render.set_params(&self.target.queue, &shared::RenderUniforms
+		self.render.set_uniforms(&self.target.queue, &shared::render::Uniforms
 		{
-			pos: self.pos,
-			scale: scale,
+			camera_pos: self.pos,
+			world_to_view_scale: scale,
+		});
+		self.render.set_instance(&self.target.queue, &shared::render::Instance
+		{
+			pos: cell_pos,
+			size: DVec2::splat(cell_size),
 		});
 
-		self.do_compute();
-		self.do_render()
+		
+		let mut commands = self.target.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+		// Compute
+		self.compute.make_compute_pass(&mut commands);
+		self.compute.copy_buffer_to_texture(&mut commands, self.render.fractal_texture());
+
+		
+		let output = self.target.surface.get_current_texture()?;
+		let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+		// Render
+		self.render.make_render_pass(&view, &mut commands);
+
+		// Submit
+		self.target.queue.submit(std::iter::once(commands.finish()));
+		output.present();
+
+		Ok(())
 	}
 
 	pub fn run(mut self, event_loop: EventLoop<()>) -> !

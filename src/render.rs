@@ -3,33 +3,65 @@ use winit::dpi::PhysicalSize;
 
 pub struct Render
 {
-	fixed: Fixed,
-    dynamic: Dynamic,
-}
-
-struct Fixed
-{
     render_pipeline: wgpu::RenderPipeline,
+    uniform: Uniform,
+    instance: Instance,
+}
+
+struct Uniform
+{
     bind_group_layout: wgpu::BindGroupLayout,
+    buffer: wgpu::Buffer,
     fractal_sampler: wgpu::Sampler,
-    uniform_buffer: wgpu::Buffer,
-}
-
-struct Dynamic
-{
     bind_group: wgpu::BindGroup,
-	fractal_texture: wgpu::Texture,
 }
 
-impl Fixed
+struct Instance
 {
-    fn new(target: &crate::Target, shader_module: &wgpu::ShaderModule) -> Self
+    bind_group_layout: wgpu::BindGroupLayout,
+    buffer: wgpu::Buffer,
+    fractal_texture: wgpu::Texture,
+    bind_group: wgpu::BindGroup,
+}
+
+impl Uniform
+{
+    fn new(target: &crate::Target) -> Self
     {
-        let uniform_buffer = target.device.create_buffer(
+        let bind_group_layout = target.device.create_bind_group_layout(
+            &wgpu::BindGroupLayoutDescriptor
+            {
+                label: None,
+                entries: &[
+                    wgpu::BindGroupLayoutEntry
+                    {
+                        binding: 0,
+                        count: None,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer
+                        {
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                            ty: wgpu::BufferBindingType::Uniform,
+                        },
+                    },
+                    wgpu::BindGroupLayoutEntry
+                    {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        // This should match the filterable field of the
+                        // corresponding Texture entry above.
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
+        
+        let buffer = target.device.create_buffer(
             &wgpu::BufferDescriptor
             {
                 label: Some("uniforms"),
-                size: std::mem::size_of::<fractal_renderer_shared::RenderUniforms>() as u64,
+                size: std::mem::size_of::<fractal_renderer_shared::render::Uniforms>() as u64,
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
@@ -42,6 +74,39 @@ impl Fixed
                 ..Default::default()
             });
         
+        let bind_group = target.device.create_bind_group(
+            &wgpu::BindGroupDescriptor
+            {
+                label: None,
+                layout: &bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry
+                    {
+                        binding: 0,
+                        resource: buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry
+                    {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&fractal_sampler),
+                    },
+                ],
+            });
+
+        Self
+        {
+            bind_group_layout,
+            buffer,
+            fractal_sampler,
+            bind_group
+        }
+    }
+}
+
+impl Instance
+{
+    fn new(target: &crate::Target, texture_size: PhysicalSize<u32>) -> Self
+    {
         let bind_group_layout = target.device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor
             {
@@ -50,27 +115,6 @@ impl Fixed
                     wgpu::BindGroupLayoutEntry
                     {
                         binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture
-                        {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry
-                    {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        // This should match the filterable field of the
-                        // corresponding Texture entry above.
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry
-                    {
-                        binding: 2,
                         count: None,
                         visibility: wgpu::ShaderStages::VERTEX,
                         ty: wgpu::BindingType::Buffer
@@ -80,14 +124,92 @@ impl Fixed
                             ty: wgpu::BufferBindingType::Uniform,
                         },
                     },
+                    wgpu::BindGroupLayoutEntry
+                    {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture
+                        {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
                 ],
             });
+            
+        let buffer = target.device.create_buffer(
+            &wgpu::BufferDescriptor
+            {
+                label: Some("instance"),
+                size: std::mem::size_of::<fractal_renderer_shared::render::Instance>() as u64,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+        
+		let fractal_texture = target.device.create_texture(
+			&wgpu::TextureDescriptor
+			{
+				label: Some("fractal_texture"),
+				size: wgpu::Extent3d
+				{
+					width: texture_size.width,
+					height: texture_size.height,
+					depth_or_array_layers: 1,
+				},
+				mip_level_count: 1,
+				sample_count: 1,
+				dimension: wgpu::TextureDimension::D2,
+				format: target.config.format,
+				usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+				view_formats: &target.config.view_formats,
+			}
+		);
+
+        let fractal_texture_view = fractal_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        
+        let bind_group = target.device.create_bind_group(
+            &wgpu::BindGroupDescriptor
+            {
+                label: None,
+                layout: &bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry
+                    {
+                        binding: 0,
+                        resource: buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry
+                    {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&fractal_texture_view),
+                    },
+                ],
+            });
+
+        Self
+        {
+            bind_group_layout,
+            buffer,
+            fractal_texture,
+            bind_group,
+        }
+    }
+}
+
+impl Render
+{
+    pub fn new(target: &crate::Target, shader_module: &wgpu::ShaderModule, texture_size: PhysicalSize<u32>) -> Self
+    {
+		let uniform = Uniform::new(target);
+        let instance = Instance::new(target, texture_size);
 
         let pipeline_layout = target.device.create_pipeline_layout(
             &wgpu::PipelineLayoutDescriptor
             {
                 label: None,
-                bind_group_layouts: &[&bind_group_layout],
+                bind_group_layouts: &[&uniform.bind_group_layout, &instance.bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -116,93 +238,15 @@ impl Fixed
 
         Self
         {
-            fractal_sampler,
-            bind_group_layout,
             render_pipeline,
-            uniform_buffer,
+            uniform,
+            instance,
         }
-    }
-}
-
-impl Dynamic
-{
-    fn new(target: &crate::Target, fixed: &Fixed, texture_size: PhysicalSize<u32>) -> Self
-    {
-		let fractal_texture = target.device.create_texture(
-			&wgpu::TextureDescriptor
-			{
-				label: Some("fractal_texture"),
-				size: wgpu::Extent3d
-				{
-					width: texture_size.width,
-					height: texture_size.height,
-					depth_or_array_layers: 1,
-				},
-				mip_level_count: 1,
-				sample_count: 1,
-				dimension: wgpu::TextureDimension::D2,
-				format: target.config.format,
-				usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-				view_formats: &target.config.view_formats,
-			}
-		);
-
-        let fractal_texture_view = fractal_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
-        let bind_group = target.device.create_bind_group(
-            &wgpu::BindGroupDescriptor
-            {
-                label: None,
-                layout: &fixed.bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry
-                    {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&fractal_texture_view),
-                    },
-                    wgpu::BindGroupEntry
-                    {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&fixed.fractal_sampler),
-                    },
-                    wgpu::BindGroupEntry
-                    {
-                        binding: 2,
-                        resource: fixed.uniform_buffer.as_entire_binding(),
-                    },
-                ],
-            });
-
-        Self
-        {
-            fractal_texture,
-            bind_group,
-        }
-    }
-}
-
-impl Render
-{
-    pub fn new(target: &crate::Target, shader_module: &wgpu::ShaderModule, texture_size: PhysicalSize<u32>) -> Self
-    {
-		let fixed = Fixed::new(target, shader_module);
-        let dynamic = Dynamic::new(target, &fixed, texture_size);
-
-        Self
-        {
-            fixed,
-            dynamic,
-        }
-    }
-
-    pub fn resize(&mut self, target: &crate::Target, new_size: PhysicalSize<u32>)
-	{
-        self.dynamic = Dynamic::new(target, &self.fixed, new_size);
     }
 
     pub fn fractal_texture(&self) -> &wgpu::Texture
     {
-        &self.dynamic.fractal_texture
+        &self.instance.fractal_texture
     }
 
     pub fn make_render_pass(&self, view: &wgpu::TextureView, commands: &mut wgpu::CommandEncoder)
@@ -224,17 +268,27 @@ impl Render
                     })],
                 depth_stencil_attachment: None,
             });
-        render_pass.set_pipeline(&self.fixed.render_pipeline);
-        render_pass.set_bind_group(0, &self.dynamic.bind_group, &[]);
+        render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_bind_group(0, &self.uniform.bind_group, &[]);
+        render_pass.set_bind_group(1, &self.instance.bind_group, &[]);
         render_pass.draw(0..6, 0..1);
     }
 
-    pub fn set_params(
+    pub fn set_uniforms(
         &self,
         queue: &wgpu::Queue,
-        params: &fractal_renderer_shared::RenderUniforms
+        uniform: &fractal_renderer_shared::render::Uniforms
     )
     {
-        queue.write_buffer(&self.fixed.uniform_buffer, 0, bytemuck::bytes_of(params));
+        queue.write_buffer(&self.uniform.buffer, 0, bytemuck::bytes_of(uniform));
+    }
+
+    pub fn set_instance(
+        &self,
+        queue: &wgpu::Queue,
+        instance: &fractal_renderer_shared::render::Instance
+    )
+    {
+        queue.write_buffer(&self.instance.buffer, 0, bytemuck::bytes_of(instance));
     }
 }

@@ -158,26 +158,26 @@ impl App
 		let viewport_size = self.viewport_world_size();
 
 		let exponent = (pixel_world_size * self.cell_size as f64).log2().floor() as i32;
-		let scale = 2.0_f64.powi(-exponent);
+		let cell_size = 2.0_f64.powi(exponent);
 
 		let viewport_min = self.pos - viewport_size / 2.0;
 		let viewport_max = self.pos + viewport_size / 2.0;
 
-		let quad_min = (viewport_min * scale).floor().as_i64vec2();
-		let quad_max = (viewport_max * scale).ceil().as_i64vec2();
+		let quad_min = (viewport_min / cell_size).floor().as_i64vec2();
+		let quad_max = (viewport_max / cell_size).ceil().as_i64vec2();
+
+		let mut cells_iter = (quad_min.x .. quad_max.x).flat_map(|x| (quad_min.y .. quad_max.y).map(move |y| i64vec2(x, y)));
+		let mut cells: Vec<_> = cells_iter.map(|pos| (pos, (self.pos - pos.as_dvec2() * cell_size).length_squared())).collect();
+		cells.sort_by(|(_pos1, dist1), (_pos2, dist2)| dist1.partial_cmp(dist2).unwrap());
 
 		let mut quad_pos = None;
-
-		'outer: for x in quad_min.x .. quad_max.x
+		for (pos, _dist) in cells
 		{
-			for y in quad_min.y .. quad_max.y
+			let cell = QuadPos { unscaled_pos: pos, exponent };
+			if !self.cells.contains_key(&cell)
 			{
-				let pos = QuadPos { unscaled_pos: i64vec2(x, y), exponent };
-				if !self.cells.contains_key(&pos)
-				{
-					quad_pos = Some(pos);
-					break 'outer;
-				}
+				quad_pos = Some(cell);
+				break;
 			}
 		}
 

@@ -1,9 +1,8 @@
 use std::collections::BTreeMap;
-use std::ops::RangeInclusive;
 
 use fractal_renderer_shared as shared;
 use shared::complex::Complex;
-use shared::fractal::FractalKind;
+use shared::fractal::{FractalKind, FractalVariation};
 use glam::{dvec2, DVec2, i64vec2};
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event_loop::{EventLoop, ControlFlow};
@@ -91,6 +90,20 @@ impl App
 		self.cells.clear();
 
 		self.fractal_params.fractal_kind = fractal_kind;
+		
+		self.target.window.request_redraw();
+	}
+
+	fn set_fractal_variation(&mut self, fractal_variation: FractalVariation)
+	{
+		if self.fractal_params.variation == fractal_variation
+		{
+			return;
+		}
+
+		self.cells.clear();
+
+		self.fractal_params.variation = fractal_variation;
 		
 		self.target.window.request_redraw();
 	}
@@ -278,12 +291,19 @@ impl App
 							{
 								VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
 								VirtualKeyCode::M => self.set_fractal_kind(FractalKind::MandelbrotSet),
-								VirtualKeyCode::J => self.set_fractal_kind(FractalKind::JuliaSet),
 								VirtualKeyCode::Comma | VirtualKeyCode::Key3 | VirtualKeyCode::Numpad3 => self.set_fractal_kind(FractalKind::Multibrot3),
 								VirtualKeyCode::T => self.set_fractal_kind(FractalKind::Tricorn),
 								VirtualKeyCode::S => self.set_fractal_kind(FractalKind::BurningShip),
 								VirtualKeyCode::C => self.set_fractal_kind(FractalKind::CosLeaf),
 								VirtualKeyCode::L => self.set_fractal_kind(FractalKind::Lyapunov),
+								VirtualKeyCode::J =>
+								{
+									self.set_fractal_variation(match self.fractal_params.variation
+									{
+										FractalVariation::Normal => FractalVariation::JuliaSet,
+										FractalVariation::JuliaSet => FractalVariation::Normal,
+									});
+								},
 								_ => {},
 							}
 						},

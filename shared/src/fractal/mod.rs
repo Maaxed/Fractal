@@ -22,7 +22,6 @@ pub enum FractalKind
 {
     // Escape time
     MandelbrotSet,
-    JuliaSet,
     Multibrot3,
     Tricorn,
     BurningShip,
@@ -32,6 +31,15 @@ pub enum FractalKind
     Lyapunov,
 }
 
+#[repr(u32)]
+#[cfg_attr(feature = "bytemuck", derive(NoUninit))]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum FractalVariation
+{
+    Normal,
+    JuliaSet,
+}
+
 #[repr(C)]
 #[cfg_attr(feature = "bytemuck", derive(Debug, NoUninit))]
 #[derive(Copy, Clone)]
@@ -39,9 +47,9 @@ pub struct FractalParams
 {
     pub secondary_pos: Complex,
     pub fractal_kind: FractalKind,
+    pub variation: FractalVariation,
     padding0: u32,
     padding1: u32,
-    padding2: u32,
 }
 
 impl Default for FractalParams
@@ -52,18 +60,18 @@ impl Default for FractalParams
         {
             secondary_pos: Complex::ZERO,
             fractal_kind: FractalKind::MandelbrotSet,
+            variation: FractalVariation::Normal,
             padding0: Default::default(),
             padding1: Default::default(),
-            padding2: Default::default(),
         }
     }
 }
 
-pub fn compute_fractal_color(pos: Complex, fractal_params: FractalParams) -> Vec3
+pub fn compute_fractal_color(pos: Complex, params: FractalParams) -> Vec3
 {
-    let v = compute_fractal_value(fractal_params.fractal_kind, pos, fractal_params.secondary_pos);
+    let v = compute_fractal_value(pos, params);
 
-    if fractal_params.fractal_kind == FractalKind::Lyapunov
+    if params.fractal_kind == FractalKind::Lyapunov
     {
         let y: f32 = if v >= 0.0 { 0.0 } else { v.exp().sqrt() };
         let r = y;
@@ -81,16 +89,15 @@ pub fn compute_fractal_color(pos: Complex, fractal_params: FractalParams) -> Vec
     vec3(r, g, b)
 }
 
-pub fn compute_fractal_value(fractal_kind: FractalKind, pos: Complex, secondary_pos: Complex) -> f32
+pub fn compute_fractal_value(pos: Complex, params: FractalParams) -> f32
 {
-    match fractal_kind
+    match params.fractal_kind
     {
-        FractalKind::MandelbrotSet => mandelbrot::mandelbrot_value(pos),
-        FractalKind::JuliaSet => mandelbrot::mandelbrot_julia_set(pos, secondary_pos),
-        FractalKind::Multibrot3 => multibrot::multibrot3(pos),
-        FractalKind::Tricorn => tricorn::tricorn(pos),
-        FractalKind::BurningShip => burning_ship::burning_ship(pos),
-        FractalKind::CosLeaf => cos_leaf::cos_leaf(pos),
+        FractalKind::MandelbrotSet => mandelbrot::mandelbrot_value(pos, params.into()),
+        FractalKind::Multibrot3 => multibrot::multibrot3(pos, params.into()),
+        FractalKind::Tricorn => tricorn::tricorn(pos, params.into()),
+        FractalKind::BurningShip => burning_ship::burning_ship(pos, params.into()),
+        FractalKind::CosLeaf => cos_leaf::cos_leaf(pos, params.into()),
         FractalKind::Lyapunov => lyapunov::lyapunov(&[false, true], pos.into()),
     }
 }

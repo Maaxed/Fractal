@@ -45,4 +45,11 @@ impl QuadPos
 
         (self.unscaled_pos.as_dvec2() + 0.5) * cell_size
     }
+
+    pub fn cell_top_right(&self) -> DVec2
+    {
+        let cell_size = self.cell_size();
+
+        (self.unscaled_pos.as_dvec2() + 1.0) * cell_size
+    }
 }

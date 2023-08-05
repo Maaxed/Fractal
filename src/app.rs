@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::ops::RangeInclusive;
 
 use fractal_renderer_shared as shared;
 use shared::complex::Complex;
@@ -136,6 +137,43 @@ impl App
 		cell
 	}
 
+	fn cleanup_cells(&mut self, viewport_size: DVec2, exponent_range: (i32, i32))
+	{
+		let valid_exponents = (exponent_range.0 - 4) ..= (exponent_range.1 + 4);
+		let valid_pos_min = self.pos - viewport_size * 2.0;
+		let valid_pos_max = self.pos + viewport_size * 2.0;
+
+		self.cells.retain(|pos, _cell| valid_exponents.contains(&pos.exponent) && pos.cell_bottom_left().cmplt(valid_pos_max).all() && pos.cell_top_right().cmpgt(valid_pos_min).all());
+	}
+
+	fn find_cell_to_load(&mut self, viewport_size: DVec2, exponent_range: (i32, i32)) -> Option<QuadPos>
+	{
+		let viewport_min = self.pos - viewport_size / 2.0;
+		let viewport_max = self.pos + viewport_size / 2.0;
+
+		for exponent in (exponent_range.0 ..= exponent_range.1).rev()
+		{
+			let cell_size = 2.0_f64.powi(exponent);
+
+			let quad_min = (viewport_min / cell_size).floor().as_i64vec2();
+			let quad_max = (viewport_max / cell_size).ceil().as_i64vec2();
+
+			let cells_iter = (quad_min.x .. quad_max.x).flat_map(|x| (quad_min.y .. quad_max.y).map(move |y| i64vec2(x, y)));
+			let mut cells: Vec<_> = cells_iter.map(|pos| (pos, (self.pos - (pos.as_dvec2() + 0.5) * cell_size).length_squared())).collect();
+			cells.sort_by(|(_pos1, dist1), (_pos2, dist2)| dist1.partial_cmp(dist2).unwrap());
+
+			for (pos, _dist) in cells
+			{
+				let cell = QuadPos { unscaled_pos: pos, exponent };
+				if !self.cells.contains_key(&cell)
+				{
+					return Some(cell);
+				}
+			}
+		}
+		None
+	}
+
 	fn do_render(&mut self, commands: &mut wgpu::CommandEncoder, output: &wgpu::SurfaceTexture)
 	{
 		let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -153,42 +191,17 @@ impl App
 	pub fn redraw(&mut self) -> Result<(), wgpu::SurfaceError>
 	{
 		self.require_redraw = false;
-		// Parameters
-		let pixel_world_size = self.pixel_world_size();
+
 		let viewport_size = self.viewport_world_size();
-
-		let exponent = (pixel_world_size * self.cell_size as f64).log2().floor() as i32;
-		let cell_size = 2.0_f64.powi(exponent);
-
-		let viewport_min = self.pos - viewport_size / 2.0;
-		let viewport_max = self.pos + viewport_size / 2.0;
-
-		let quad_min = (viewport_min / cell_size).floor().as_i64vec2();
-		let quad_max = (viewport_max / cell_size).ceil().as_i64vec2();
-
-		let valid_exponents = (exponent - 4) ..= (exponent + 6);
-		let valid_pos_min = self.pos - viewport_size * 2.0;
-		let valid_pos_max = self.pos + viewport_size * 2.0;
+		let min_exponent = (self.pixel_world_size() * self.cell_size as f64).log2().floor() as i32;
+		let max_exponent = (self.zoom.log2().ceil() as i32 + 1).max(min_exponent);
+		let exponent_range = (min_exponent, max_exponent);
 
 		// Free cells that are far away
-		self.cells.retain(|pos, _cell| valid_exponents.contains(&pos.exponent) && pos.cell_bottom_left().cmplt(valid_pos_max).all() && pos.cell_top_right().cmpgt(valid_pos_min).all());
+		self.cleanup_cells(viewport_size, exponent_range);
 
 		// Find new cell to load
-		let mut cells_iter = (quad_min.x .. quad_max.x).flat_map(|x| (quad_min.y .. quad_max.y).map(move |y| i64vec2(x, y)));
-		let mut cells: Vec<_> = cells_iter.map(|pos| (pos, (self.pos - (pos.as_dvec2() + 0.5) * cell_size).length_squared())).collect();
-		cells.sort_by(|(_pos1, dist1), (_pos2, dist2)| dist1.partial_cmp(dist2).unwrap());
-
-		let mut quad_pos = None;
-		for (pos, _dist) in cells
-		{
-			let cell = QuadPos { unscaled_pos: pos, exponent };
-			if !self.cells.contains_key(&cell)
-			{
-				quad_pos = Some(cell);
-				break;
-			}
-		}
-
+		let quad_pos = self.find_cell_to_load(viewport_size, exponent_range);
 		
 		let mut commands = self.target.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
@@ -196,7 +209,6 @@ impl App
 		{
 			self.cells.insert(pos, self.compute_cell(&mut commands, pos));
 			self.require_redraw = true;
-			self.target.window.request_redraw();
 		}
 		
 		let output = self.target.surface.get_current_texture()?;

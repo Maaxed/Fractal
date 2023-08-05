@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use fractal_renderer_shared as shared;
 use shared::complex::Complex;
 use shared::fractal::FractalKind;
-use glam::{dvec2, DVec2};
+use glam::{dvec2, DVec2, i64vec2};
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseScrollDelta, MouseButton};
@@ -25,6 +25,7 @@ pub struct App
 	prev_mouse_pos: Option<PhysicalPosition<f64>>,
 	mouse_left_down: bool,
 	mouse_right_down: bool,
+	require_redraw: bool,
 }
 
 impl App
@@ -57,6 +58,7 @@ impl App
 			prev_mouse_pos: None,
 			mouse_left_down: false,
 			mouse_right_down: false,
+			require_redraw: false,
 		}
 	}
 
@@ -102,6 +104,12 @@ impl App
 		self.base_pixel_world_size() * self.zoom
 	}
 
+	fn viewport_world_size(&self) -> DVec2
+	{
+		let window_size = dvec2(self.target.config.width as f64, self.target.config.height as f64);
+		window_size * self.pixel_world_size()
+	}
+
 	fn compute_cell(&self, commands: &mut wgpu::CommandEncoder, pos: QuadPos) -> crate::render::Instance
 	{
 		let cell_size = pos.cell_size();
@@ -128,36 +136,64 @@ impl App
 		cell
 	}
 
+	fn do_render(&mut self, commands: &mut wgpu::CommandEncoder, output: &wgpu::SurfaceTexture)
+	{
+		let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+		let scale = 2.0 / self.viewport_world_size();
+		self.render.set_uniforms(&self.target.queue, &shared::render::Uniforms
+			{
+				camera_pos: self.pos,
+				world_to_view_scale: scale,
+			});
+
+		self.render.make_render_pass(self.cells.iter().map(|(_pos, instance)| instance), &view, commands);
+	}
+
 	pub fn redraw(&mut self) -> Result<(), wgpu::SurfaceError>
 	{
+		self.require_redraw = false;
 		// Parameters
 		let pixel_world_size = self.pixel_world_size();
+		let viewport_size = self.viewport_world_size();
+
 		let exponent = (pixel_world_size * self.cell_size as f64).log2().floor() as i32;
-		let quad_pos = QuadPos { unscaled_pos: (self.pos * 2.0_f64.powi(-exponent)).floor().as_i64vec2(), exponent };
+		let scale = 2.0_f64.powi(-exponent);
+
+		let viewport_min = self.pos - viewport_size / 2.0;
+		let viewport_max = self.pos + viewport_size / 2.0;
+
+		let quad_min = (viewport_min * scale).floor().as_i64vec2();
+		let quad_max = (viewport_max * scale).ceil().as_i64vec2();
+
+		let mut quad_pos = None;
+
+		'outer: for x in quad_min.x .. quad_max.x
+		{
+			for y in quad_min.y .. quad_max.y
+			{
+				let pos = QuadPos { unscaled_pos: i64vec2(x, y), exponent };
+				if !self.cells.contains_key(&pos)
+				{
+					quad_pos = Some(pos);
+					break 'outer;
+				}
+			}
+		}
 
 		
 		let mut commands = self.target.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-		// Compute
-		if !self.cells.contains_key(&quad_pos)
+		if let Some(pos) = quad_pos
 		{
-			self.cells.insert(quad_pos, self.compute_cell(&mut commands, quad_pos));
-
+			self.cells.insert(pos, self.compute_cell(&mut commands, pos));
+			self.require_redraw = true;
+			self.target.window.request_redraw();
 		}
-
 		
 		let output = self.target.surface.get_current_texture()?;
-		let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-		// Render
-		let window_size = dvec2(self.target.config.width as f64, self.target.config.height as f64);
-		let scale = 2.0 / (window_size * pixel_world_size);
-		self.render.set_uniforms(&self.target.queue, &shared::render::Uniforms
-		{
-			camera_pos: self.pos,
-			world_to_view_scale: scale,
-		});
-		self.render.make_render_pass(self.cells.iter().map(|(_pos, instance)| instance), &view, &mut commands);
+		self.do_render(&mut commands, &output);
 
 		// Submit
 		self.target.queue.submit(std::iter::once(commands.finish()));
@@ -185,6 +221,14 @@ impl App
 						Err(e @ wgpu::SurfaceError::Outdated | e @ wgpu::SurfaceError::Timeout) => eprintln!("{:?}", e),
 					}
 				},
+				Event::MainEventsCleared =>
+				{
+					if self.require_redraw
+					{
+						self.require_redraw = false;
+						self.target.window.request_redraw();
+					}
+				}
 				Event::WindowEvent { window_id, ref event} if window_id == self.target.window.id() =>
 				{
 					match event

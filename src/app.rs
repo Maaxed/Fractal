@@ -17,6 +17,7 @@ pub struct App
 	target: crate::Target,
 	render: crate::render::Render,
 	compute: crate::compute::Compute,
+	cell_size: u32,
 	cells: BTreeMap<QuadPos, crate::render::Instance>,
     pos: DVec2,
     zoom: f64,
@@ -48,6 +49,7 @@ impl App
 			target,
 			render,
 			compute,
+			cell_size: cell_size.width.min(cell_size.height),
 			cells: BTreeMap::new(),
 			pos: DVec2::ZERO,
 			zoom: 1.0,
@@ -70,7 +72,7 @@ impl App
 
 		if let Some(mouse_pos) = self.prev_mouse_pos
 		{
-			self.pos += dvec2(mouse_pos.x - self.target.config.width as f64 * 0.5, self.target.config.height as f64 * 0.5 - mouse_pos.y) * self.pixel_world_size() * (old_zoom - self.zoom);
+			self.pos += dvec2(mouse_pos.x - self.target.config.width as f64 * 0.5, self.target.config.height as f64 * 0.5 - mouse_pos.y) * self.base_pixel_world_size() * (old_zoom - self.zoom);
 		}
 		
 		self.target.window.request_redraw();
@@ -90,9 +92,14 @@ impl App
 		self.target.window.request_redraw();
 	}
 
+	fn base_pixel_world_size(&self) -> f64
+	{
+		4.0 / self.target.config.width.min(self.target.config.height) as f64
+	}
+
 	fn pixel_world_size(&self) -> f64
 	{
-		4.0 / (self.target.config.width.min(self.target.config.height) as f64 - 1.0)
+		self.base_pixel_world_size() * self.zoom
 	}
 
 	fn compute_cell(&self, commands: &mut wgpu::CommandEncoder, pos: QuadPos) -> crate::render::Instance
@@ -124,10 +131,8 @@ impl App
 	pub fn redraw(&mut self) -> Result<(), wgpu::SurfaceError>
 	{
 		// Parameters
-		let window_size = self.target.window.inner_size();
-		let ratio = (if window_size.width < window_size.height { window_size.width } else { window_size.height }) as f64;
-		
-		let exponent = self.zoom.log2().round() as i32 + 1;
+		let pixel_world_size = self.pixel_world_size();
+		let exponent = (pixel_world_size * self.cell_size as f64).log2().floor() as i32;
 		let quad_pos = QuadPos { unscaled_pos: (self.pos * 2.0_f64.powi(-exponent)).floor().as_i64vec2(), exponent };
 
 		
@@ -145,7 +150,8 @@ impl App
 		let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
 		// Render
-		let scale = ratio / (2.0 * dvec2(window_size.width as f64, window_size.height as f64) * self.zoom);
+		let window_size = dvec2(self.target.config.width as f64, self.target.config.height as f64);
+		let scale = 2.0 / (window_size * pixel_world_size);
 		self.render.set_uniforms(&self.target.queue, &shared::render::Uniforms
 		{
 			camera_pos: self.pos,
@@ -246,13 +252,13 @@ impl App
 							{
 								if self.mouse_left_down
 								{
-									self.pos -= dvec2(position.x - prev_pos.x, prev_pos.y - position.y) * self.pixel_world_size() * self.zoom;
+									self.pos -= dvec2(position.x - prev_pos.x, prev_pos.y - position.y) * self.pixel_world_size();
 									self.target.window.request_redraw();
 								}
 								else if self.mouse_right_down
 								{
 									self.cells.clear();
-									self.fractal_params.secondary_pos -= Complex::new(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size() * self.zoom;
+									self.fractal_params.secondary_pos -= Complex::new(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size();
 									self.target.window.request_redraw();
 								}
 							}

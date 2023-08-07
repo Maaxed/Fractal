@@ -21,6 +21,7 @@ pub struct App
 	cells: BTreeMap<QuadPos, crate::render::Instance>,
     pos: DVec2,
     zoom: f64,
+	secondary_zoom: f64,
 	fractal_params: shared::fractal::FractalParams,
 	prev_mouse_pos: Option<PhysicalPosition<f64>>,
 	mouse_left_down: bool,
@@ -54,6 +55,7 @@ impl App
 			cells: BTreeMap::new(),
 			pos: DVec2::ZERO,
 			zoom: 1.0,
+			secondary_zoom: 1.0,
 			fractal_params: Default::default(),
 			prev_mouse_pos: None,
 			mouse_left_down: false,
@@ -303,6 +305,16 @@ impl App
 										FractalVariation::Normal => FractalVariation::JuliaSet,
 										FractalVariation::JuliaSet => FractalVariation::Normal,
 									});
+									(self.pos, self.fractal_params.secondary_pos) = (self.fractal_params.secondary_pos.into(), self.pos.into());
+									(self.zoom, self.secondary_zoom) = (self.secondary_zoom, self.zoom);
+								},
+								VirtualKeyCode::R =>
+								{
+									self.cells = BTreeMap::new();
+									self.pos = DVec2::ZERO;
+									self.zoom = 1.0;
+									self.fractal_params.secondary_pos = Complex::ZERO;
+									self.target.window.request_redraw();
 								},
 								_ => {},
 							}

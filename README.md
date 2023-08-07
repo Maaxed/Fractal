@@ -18,9 +18,9 @@ cargo run --release
 - Right Click + Drag: Change the julia constant
 - Scroll Wheel: Zoom in / out
 - M: Mandelbrot set
-- J: Julia set
 - Keypad 3: Multibrot set with exponent 3
 - T: Tricorn
 - S: Burning ship fractal
 - C: Mandelbrot method with z<sub>n+1</sub> = cos(z<sub>n</sub>) + 1 / c
 - L: Lyapunov fractal
+- J: Switch between normal mode and julia set mode

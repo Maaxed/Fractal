@@ -80,13 +80,37 @@ pub fn compute_fractal_color(pos: Complex, params: FractalParams) -> Vec3
         return vec3(r, g, b);
     }
 
+    /*
     // Gradient: black - red - yellow - white
     let threshold1 = 0.2;
     let threshold2 = 0.6;
     let r = if v > threshold1 { 1.0 } else { v / threshold1 };
     let g = if v > threshold2 { 1.0 } else if v > threshold1 { (v - threshold1) / (threshold2 - threshold1) } else { 0.0 };
     let b = if v > threshold2 { (v - threshold2) / (1.0 - threshold2) } else { 0.0 };
-    vec3(r, g, b)
+    */
+    if v < 0.0
+    {
+        return vec3(0.0, 0.0, 0.0);
+    }
+
+    let v = (v + 1.0).ln();
+    //let v = v.powf(0.25);
+
+    // Gradient: black - red - yellow - black
+    /*let threshold1 = 0.2;
+    let threshold2 = 0.6;
+    let r = if v > threshold2 { 1.0 - (v - threshold2) / (1.0 - threshold2) } else if v > threshold1 { 1.0 } else { v / threshold1 };
+    let g = if v > threshold2 { 1.0 - (v - threshold2) / (1.0 - threshold2) } else if v > threshold1 { (v - threshold1) / (threshold2 - threshold1) } else { 0.0 };
+    let b = 0.0;*/
+    //Gradient: orange - purple - blue - cyan - white - yellow
+    let palette = [vec3(1.0, 0.5, 0.0), vec3(0.5, 0.0, 1.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 1.0), vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, 0.0), vec3(1.0, 0.5, 0.0)];
+    let v = v % (palette.len() - 1) as f32;
+
+    let i = v.floor() as usize;
+    let t = v % 1.0;
+    let c1 = palette[i];
+    let c2 = palette[i+1];
+    c1 + (c2 - c1) * t
 }
 
 pub fn compute_fractal_value(pos: Complex, params: FractalParams) -> f32

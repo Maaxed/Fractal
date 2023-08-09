@@ -5,7 +5,7 @@ const ITERATION_COUNT: u32 = 1024;
 
 pub fn cos_leaf(pos: Complex, params: Params) -> f32
 {
-    compute_escape_time(pos, params, ITERATION_COUNT, 100.0, |z, c|
+    compute_escape_time(pos, params, ITERATION_COUNT, 100.0, None, |z, c|
     {
         (z / c).cos()
     })

@@ -1,7 +1,7 @@
 #![no_std]
 #![deny(warnings)]
 
-pub mod complex;
+pub mod math;
 pub mod fractal;
 pub mod render;
 

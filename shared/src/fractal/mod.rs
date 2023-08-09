@@ -6,15 +6,10 @@ pub mod burning_ship;
 pub mod cos_leaf;
 pub mod lyapunov;
 
-use crate::complex::Complex;
-use num_traits::Pow;
+use crate::math::*;
 use glam::{Vec3, vec3};
 #[cfg(feature = "bytemuck")]
 use bytemuck::NoUninit;
-
-#[cfg(target_arch = "spirv")]
-use num_traits::Float;
-
 use self::escape_time_method::EscapeResult;
 
 #[repr(u32)]
@@ -81,10 +76,10 @@ pub fn compute_fractal_color(pos: Complex, params: FractalParams) -> Vec3
         FractalKind::Lyapunov =>
         {
             let v = lyapunov::lyapunov(&[false, true], pos.into());
-            let y: f32 = if v >= 0.0 { 0.0 } else { v.exp().sqrt() };
+            let y: f32 = if v >= 0.0 { 0.0 } else { sqrt(exp(v)) };
             let r = y;
-            let g = 1.0 - (1.0 - y).pow(0.55);
-            let b = if v <= 0.0 { 0.0 } else { 1.0 - (-v).exp().pow(3.0) };
+            let g = 1.0 - pow(1.0 - y, 0.55);
+            let b = if v <= 0.0 { 0.0 } else { 1.0 - pow(exp(-v), 3.0) };
             return vec3(r, g, b);
         },
     };
@@ -109,13 +104,13 @@ pub fn compute_fractal_color(pos: Complex, params: FractalParams) -> Vec3
         EscapeResult::StayedInside => vec3(0.0, 0.0, 0.0),
         EscapeResult::Escaped(v) =>
         {
-            let v = (v + 1.0).ln();
+            let v = ln(v + 1.0);
 
             //Gradient: orange - purple - blue - cyan - white - yellow
             let palette = [vec3(1.0, 0.5, 0.0), vec3(0.5, 0.0, 1.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 1.0), vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, 0.0), vec3(1.0, 0.5, 0.0)];
             let v = v % (palette.len() - 1) as f32;
 
-            let i = v.floor() as usize;
+            let i = floor(v) as usize;
             let t = v % 1.0;
             let c1 = palette[i];
             let c2 = palette[i+1];

@@ -1,4 +1,4 @@
-use crate::complex::Complex;
+use crate::math::Complex;
 use super::escape_time_method::*;
 use super::FractalVariation;
 

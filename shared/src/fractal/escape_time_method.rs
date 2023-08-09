@@ -1,9 +1,6 @@
-use crate::complex::Complex;
+use crate::math::*;
 
 use super::{FractalVariation, FractalParams};
-
-#[cfg(target_arch = "spirv")]
-use num_traits::Float;
 
 pub struct Params
 {
@@ -34,7 +31,7 @@ pub enum EscapeResult
 pub fn compute_escape_time(pos: Complex, params: Params, iteration_count: u32, bailout_radius: f64, potential_power: Option<f32>, mut iteration_function: impl FnMut(Complex, Complex) -> Complex) -> EscapeResult
 {
     let bailout_squared = bailout_radius * bailout_radius;
-    let log_p = potential_power.map(|p| p.ln());
+    let log_p = potential_power.map(ln);
     let (mut z, c) = match params.variation
         {
             FractalVariation::Normal => (Complex::ZERO, pos),
@@ -48,8 +45,8 @@ pub fn compute_escape_time(pos: Complex, params: Params, iteration_count: u32, b
         {
             return EscapeResult::Escaped(if let Some(log_p) = log_p
             {
-                let log_zn = (length_squared as f32).log2() / 2.0;
-                (i as f32 + 1.0 - log_zn.ln() / log_p).max(0.0)
+                let log_zn = log2(length_squared as f32) / 2.0;
+                (i as f32 + 1.0 - ln(log_zn) / log_p).max(0.0)
             }
             else
             {

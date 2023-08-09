@@ -1,7 +1,5 @@
 use glam::DVec2;
-
-#[cfg(target_arch = "spirv")]
-use num_traits::Float;
+use crate::math::*;
 
 const ITERATION_COUNT: usize = 1024;
 
@@ -21,7 +19,7 @@ pub fn lyapunov<const L: usize>(sequence: &[bool; L], pos: DVec2) -> f32
 
         if i != 0
         {
-            lyapunov_exp += ((rn * (1.0 - 2.0 * x)).abs() as f32).ln();
+            lyapunov_exp += ln(abs((rn * (1.0 - 2.0 * x)) as f32));
         }
 
         x = rn * x * (1.0 - x);

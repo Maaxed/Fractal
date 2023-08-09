@@ -1,5 +1,5 @@
 use glam::DVec2;
-use crate::complex::Complex;
+use crate::math::Complex;
 use super::escape_time_method::*;
 
 const ITERATION_COUNT: u32 = 1024;

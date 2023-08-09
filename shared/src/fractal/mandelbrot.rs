@@ -4,7 +4,7 @@ use super::FractalVariation;
 
 const ITERATION_COUNT: u32 = 1024;
 
-pub fn mandelbrot_value(pos: Complex, params: Params) -> f32
+pub fn mandelbrot_value(pos: Complex, params: Params) -> EscapeResult
 {
     if params.variation == FractalVariation::Normal
     {
@@ -14,7 +14,7 @@ pub fn mandelbrot_value(pos: Complex, params: Params) -> f32
         if q * (q + (pos.re() - 0.25)) <= 0.25 * pos.im() * pos.im() // the point is within the cardioid
             || (pos + Complex::new(1.0, 0.0)).modulus_squared() < 0.25 * 0.25 // the point is within the period-2 bulb
         {
-            return -1.0
+            return EscapeResult::StayedInside;
         }
     }
 

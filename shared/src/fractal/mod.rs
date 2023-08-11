@@ -23,6 +23,7 @@ pub enum FractalKind
     Tricorn,
     BurningShip,
     CosLeaf,
+    MandelbrotNormal,
 
     // Other
     Lyapunov,
@@ -73,6 +74,20 @@ pub fn compute_fractal_color(pos: Complex, params: FractalParams) -> Vec3
         FractalKind::Tricorn => tricorn::tricorn(pos, params.into()),
         FractalKind::BurningShip => burning_ship::burning_ship(pos, params.into()),
         FractalKind::CosLeaf => cos_leaf::cos_leaf(pos, params.into()),
+        FractalKind::MandelbrotNormal =>
+        {
+            let res = mandelbrot::mandelbrot_value_normal(pos, params.into());
+
+            return match res
+            {
+                EscapeResult::StayedInside => vec3(0.0, 0.0, 0.0),
+                EscapeResult::Escaped(v) =>
+                {
+                    let g = v * 0.9 + 0.1;
+                    Vec3::splat(g)
+                },
+            };
+        },
         FractalKind::Lyapunov =>
         {
             let v = lyapunov::lyapunov(&[false, true], pos.into());

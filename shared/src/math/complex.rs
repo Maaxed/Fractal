@@ -50,7 +50,15 @@ impl Complex
 
     pub fn from_polar(modulus: f64, argument: f64) -> Self
     {
-        Self::from(DVec2::from_angle(argument)) * modulus
+        if cfg!(target_arch = "spirv")
+        {
+            Complex32::from_polar(modulus as f32, argument as f32).as_complex64()
+        }
+        else
+        {
+            Self::from(DVec2::from_angle(argument)) * modulus
+        }
+
     }
 
     /// The real part of the complex number

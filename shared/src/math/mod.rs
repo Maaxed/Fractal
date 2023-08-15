@@ -1,6 +1,8 @@
 mod complex;
+pub mod function;
 
 pub use complex::*;
+pub use function::{Func, Function, Differentiable};
 
 #[cfg(target_arch = "spirv")]
 use num_traits::Float;

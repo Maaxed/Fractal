@@ -3,6 +3,7 @@ use core::ops::*;
 use core::iter::{Product, Sum};
 #[cfg(feature = "bytemuck")]
 use bytemuck::NoUninit;
+use num_traits::{Zero, One};
 
 #[cfg(target_arch = "spirv")]
 use num_traits::Float;
@@ -33,6 +34,27 @@ impl Default for Complex
     fn default() -> Self
     {
         Self::ZERO
+    }
+}
+
+impl Zero for Complex
+{
+    fn zero() -> Self
+    {
+        Self::ZERO
+    }
+
+    fn is_zero(&self) -> bool
+    {
+        *self == Self::ZERO
+    }
+}
+
+impl One for Complex
+{
+    fn one() -> Self
+    {
+        Self::ONE
     }
 }
 

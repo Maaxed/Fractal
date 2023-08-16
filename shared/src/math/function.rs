@@ -1,5 +1,5 @@
-use num_traits::{Zero, One};
-use core::{ops::{Add, Sub, Mul, Div, Neg}, marker::PhantomData};
+use num_traits::{Float, Zero, One, Inv, Pow, NumCast};
+use core::ops::{Add, Sub, Mul, Div, Neg};
 
 use super::{Complex, Complex32};
 
@@ -39,14 +39,54 @@ impl<F> Func<F>
 		self.0.derivative()
 	}
 
-	pub fn make<I>(f: impl FnOnce(Func<Identity<I>>) -> Self) -> Self
+	pub fn make(f: impl FnOnce(Func<Identity>) -> Self) -> Self
 	{
-		f(Func::identity())
+		f(Func::IDENTITY)
 	}
 
 	pub fn compose<R>(self, other: Func<R>) -> Func<Composition<F, R>>
 	{
 		Func(Composition(self.0, other.0))
+	}
+
+	pub fn exp(self) -> Func<Composition<Exp, F>>
+	{
+		Func::EXP.compose(self)
+	}
+
+	pub fn ln(self) -> Func<Composition<Ln, F>>
+	{
+		Func::LN.compose(self)
+	}
+
+	pub fn log<B>(self, base: Func<B>) -> Func<Division<Composition<Ln, F>, Composition<Ln, B>>>
+	{
+		self.ln() / base.ln()
+	}
+
+	pub fn sqrt(self) -> Func<Composition<Sqrt, F>>
+	{
+		Func::SQRT.compose(self)
+	}
+
+	pub fn pow_const<E>(self, exponent: E) -> Func<Composition<PowConst<E>, F>>
+	{
+		Func(PowConst(exponent)).compose(self)
+	}
+
+	pub fn sin(self) -> Func<Composition<Sin, F>>
+	{
+		Func::SIN.compose(self)
+	}
+
+	pub fn cos(self) -> Func<Composition<Cos, F>>
+	{
+		Func::COS.compose(self)
+	}
+
+	pub fn tan(self) -> Func<Composition<Tan, F>>
+	{
+		Func::TAN.compose(self)
 	}
 }
 
@@ -93,25 +133,22 @@ impl<I, O: Zero> Differentiable<I> for Constant<O>
 
 
 #[derive(Debug, Copy, Clone)]
-pub struct Identity<T>(PhantomData<fn(T) -> T>);
+pub struct Identity;
 
-impl<T> Func<Identity<T>>
+impl Func<Identity>
 {
-	pub fn identity() -> Self
-	{
-		Self(Identity(PhantomData))
-	}
+	pub const IDENTITY: Self = Self(Identity);
 }
 
-impl<T> Default for Func<Identity<T>>
+impl Default for Func<Identity>
 {
 	fn default() -> Self
 	{
-		Self::identity()
+		Self::IDENTITY
 	}
 }
 
-impl<T> Function<T> for Identity<T>
+impl<T> Function<T> for Identity
 {
 	type Output = T;
 	
@@ -121,7 +158,7 @@ impl<T> Function<T> for Identity<T>
 	}
 }
 
-impl<T: One> Differentiable<T> for Identity<T>
+impl<T: One> Differentiable<T> for Identity
 {
 	type Derivative = Constant<T>;
 
@@ -241,9 +278,7 @@ where
 	}
 }
 
-impl<I, T> Differentiable<I> for Negative<T>
-where
-	T: Differentiable<I>
+impl<I, T: Differentiable<I>> Differentiable<I> for Negative<T>
 {
 	type Derivative = Negative<T::Derivative>;
 
@@ -337,6 +372,45 @@ where
 
 
 #[derive(Debug, Copy, Clone)]
+pub struct Inverse<T>(pub T);
+
+impl<F> Inv for Func<F>
+{
+	type Output = Func<Inverse<F>>;
+	
+	fn inv(self) -> Self::Output
+	{
+		Func(Inverse(self.0))
+	}
+}
+
+impl<I, O, T> Function<I> for Inverse<T>
+where
+	T: Function<I>,
+	T::Output: Inv<Output = O>,
+{
+	type Output = O;
+	
+	fn get(&self, x: I) -> Self::Output
+	{
+		self.0.get(x).inv()
+	}
+}
+
+impl<I, T> Differentiable<I> for Inverse<T>
+where
+	T: Differentiable<I> + Clone
+{
+	type Derivative = Negative<Division<T::Derivative, Product<T, T>>>;
+
+	fn derivative(&self) -> Func<Self::Derivative>
+	{
+		-(self.0.derivative() / (Func(self.0.clone()) * Func(self.0.clone())))
+	}
+}
+
+
+#[derive(Debug, Copy, Clone)]
 pub struct Composition<A, B>(pub A, pub B); // A°B: x |-> A(B(x))
 
 impl<I, O, A, B> Function<I> for Composition<A, B>
@@ -362,6 +436,254 @@ where
 	fn derivative(&self) -> Func<Self::Derivative>
 	{
 		self.1.derivative() * self.0.derivative().compose(Func(self.1.clone()))
+	}
+}
+
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct Exp;
+
+impl Func<Exp>
+{
+	pub const EXP: Self = Func(Exp);
+}
+
+impl<I: Float> Function<I> for Exp
+{
+	type Output = I;
+	
+	fn get(&self, x: I) -> Self::Output
+	{
+		x.exp()
+	}
+}
+
+impl<I> Differentiable<I> for Exp
+{
+	type Derivative = Self;
+
+	fn derivative(&self) -> Func<Self::Derivative>
+	{
+		Func(*self)
+	}
+}
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct Ln;
+
+impl Func<Ln>
+{
+	pub const LN: Self = Func(Ln);
+}
+
+impl<I: Float> Function<I> for Ln
+{
+	type Output = I;
+	
+	fn get(&self, x: I) -> Self::Output
+	{
+		x.ln()
+	}
+}
+
+impl<I> Differentiable<I> for Ln
+{
+	type Derivative = Inverse<Identity>;
+
+	fn derivative(&self) -> Func<Self::Derivative>
+	{
+		Func::IDENTITY.inv()
+	}
+}
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct Sqrt;
+
+impl Func<Sqrt>
+{
+	pub const SQRT: Self = Func(Sqrt);
+}
+
+impl<I: Float> Function<I> for Sqrt
+{
+	type Output = I;
+	
+	fn get(&self, x: I) -> Self::Output
+	{
+		x.sqrt()
+	}
+}
+
+impl<I: Float> Differentiable<I> for Sqrt
+{
+	type Derivative = Division<Constant<I>, Self>;
+
+	fn derivative(&self) -> Func<Self::Derivative>
+	{
+		Func::constant(NumCast::from(0.5).unwrap()) / Func(*self)
+	}
+}
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct PowConst<E>(pub E);
+
+impl<I, O, E> Function<I> for PowConst<E>
+where
+	I: Pow<E, Output = O>,
+	E: Clone
+{
+	type Output = O;
+	
+	fn get(&self, x: I) -> Self::Output
+	{
+		x.pow(self.0.clone())
+	}
+}
+
+impl<I, E> Differentiable<I> for PowConst<E>
+	where
+		E: One + Sub<Output = E> + Clone
+{
+	type Derivative = Product<Constant<E>, Self>;
+
+	fn derivative(&self) -> Func<Self::Derivative>
+	{
+		Func::constant(self.0.clone()) * Func(PowConst(self.0.clone() - One::one()))
+	}
+}
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct Power<B, E>(pub B, pub E);
+
+impl<L, R> Pow<Func<R>> for Func<L>
+{
+	type Output = Func<Power<L, R>>;
+	
+	fn pow(self, other: Func<R>) -> Self::Output
+	{
+		Func(Power(self.0, other.0))
+	}
+}
+
+impl<I, O, B, E> Function<I> for Power<B, E>
+where
+	I: Clone,
+	B: Function<I>,
+	E: Function<I>,
+	B::Output: Pow<E::Output, Output = O>
+{
+	type Output = O;
+	
+	fn get(&self, x: I) -> Self::Output
+	{
+		self.0.get(x.clone()).pow(self.1.get(x))
+	}
+}
+
+impl<I, B, E> Differentiable<I> for Power<B, E>
+where
+	B: Differentiable<I> + Clone,
+	E: Differentiable<I> + Clone,
+{
+	type Derivative = Product<Self, Sum<Product<E::Derivative, Composition<Ln, B>>, Product<E, Division<B::Derivative, B>>>>;
+
+	fn derivative(&self) -> Func<Self::Derivative>
+	{
+		// Using logarithmic differentiation
+		// = self * (self.1 * self.0.ln()).derivative()
+		Func(self.clone()) * (self.1.derivative() * Func(self.0.clone()).ln() + Func(self.1.clone()) * (self.0.derivative() / Func(self.0.clone())))
+	}
+}
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct Sin;
+
+impl Func<Sin>
+{
+	pub const SIN: Self = Func(Sin);
+}
+
+impl<I: Float> Function<I> for Sin
+{
+	type Output = I;
+	
+	fn get(&self, x: I) -> Self::Output
+	{
+		x.sin()
+	}
+}
+
+impl<I: Float> Differentiable<I> for Sin
+{
+	type Derivative = Cos;
+
+	fn derivative(&self) -> Func<Self::Derivative>
+	{
+		Func::COS
+	}
+}
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct Cos;
+
+impl Func<Cos>
+{
+	pub const COS: Self = Func(Cos);
+}
+
+impl<I: Float> Function<I> for Cos
+{
+	type Output = I;
+	
+	fn get(&self, x: I) -> Self::Output
+	{
+		x.cos()
+	}
+}
+
+impl<I: Float> Differentiable<I> for Cos
+{
+	type Derivative = Negative<Sin>;
+
+	fn derivative(&self) -> Func<Self::Derivative>
+	{
+		-Func::SIN
+	}
+}
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct Tan;
+
+impl Func<Tan>
+{
+	pub const TAN: Self = Func(Tan);
+}
+
+impl<I: Float> Function<I> for Tan
+{
+	type Output = I;
+	
+	fn get(&self, x: I) -> Self::Output
+	{
+		x.tan()
+	}
+}
+
+impl<I: Float> Differentiable<I> for Tan
+{
+	type Derivative = Inverse<Product<Cos, Cos>>;
+
+	fn derivative(&self) -> Func<Self::Derivative>
+	{
+		(Func::COS * Func::COS).inv()
 	}
 }
 

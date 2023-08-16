@@ -5,6 +5,8 @@ use core::iter::{Product, Sum};
 use bytemuck::NoUninit;
 use num_traits::{Zero, One};
 
+use super::{Exp, Trigo};
+
 #[cfg(target_arch = "spirv")]
 use num_traits::Float;
 
@@ -124,61 +126,6 @@ impl Complex
     pub fn conjugate(self) -> Self
     {
         Self::new(self.re(), -self.im())
-    }
-
-    pub fn squared(&self) -> Self
-    {
-        Self::new(self.re() * self.re() - self.im() * self.im(), 2.0 * self.re() * self.im())
-    }
-
-    pub fn exp(self) -> Self
-    {
-        if cfg!(target_arch = "spirv")
-        {
-            self.as_complex32().exp().as_complex64()
-        }
-        else
-        {
-            Self::from_polar(self.re().exp(), self.im())
-        }
-    }
-
-    pub fn ln(self) -> Self
-    {
-        if cfg!(target_arch = "spirv")
-        {
-            self.as_complex32().ln().as_complex64()
-        }
-        else
-        {
-            Self::new(self.modulus().ln(), self.argument())
-        }
-    }
-    
-    pub fn sin(self) -> Self
-    {
-        if cfg!(target_arch = "spirv")
-        {
-            self.as_complex32().sin().as_complex64()
-        }
-        else
-        {
-            let (sin, cos) = self.re().sin_cos();
-            Self::new(sin * self.im().cosh(), cos * self.im().sinh())
-        }
-    }
-    
-    pub fn cos(self) -> Self
-    {
-        if cfg!(target_arch = "spirv")
-        {
-            self.as_complex32().cos().as_complex64()
-        }
-        else
-        {
-            let (sin, cos) = self.re().sin_cos();
-            Self::new(cos * self.im().cosh(), -sin * self.im().sinh())
-        }
     }
 
     pub fn as_complex32(self) -> Complex32
@@ -359,6 +306,86 @@ impl<'a> Product<&'a Self> for Complex
     }
 }
 
+impl Exp for Complex
+{
+    fn squared(self) -> Self
+    {
+        Self::new(self.re() * self.re() - self.im() * self.im(), 2.0 * self.re() * self.im())
+    }
+
+    fn sqrt(self) -> Self
+    {
+        // In polar coordinate: Self::from_polar(modulus.sqrt(), arg / 2.0)
+
+        let modulus = self.modulus();
+        let sgn = if self.im() < 0.0 { -1.0 } else { 1.0 };
+        Self::new((modulus + self.re()) / 2.0, sgn * (modulus - self.re()) / 2.0)
+    }
+
+    fn exp(self) -> Self
+    {
+        if cfg!(target_arch = "spirv")
+        {
+            self.as_complex32().exp().as_complex64()
+        }
+        else
+        {
+            Self::from_polar(Exp::exp(self.re()), self.im())
+        }
+    }
+
+    fn pow(self, exp: Self) -> Self
+    {
+        (exp * self.ln()).exp()
+    }
+
+    fn ln(self) -> Self
+    {
+        if cfg!(target_arch = "spirv")
+        {
+            self.as_complex32().ln().as_complex64()
+        }
+        else
+        {
+            Self::new(Exp::ln(self.modulus()), self.argument())
+        }
+    }
+
+    fn log(self, base: Self) -> Self
+    {
+        self.ln() / base.ln()
+    }
+}
+
+impl super::Trigo for Complex
+{
+    fn sin(self) -> Self
+    {
+        if cfg!(target_arch = "spirv")
+        {
+            self.as_complex32().sin().as_complex64()
+        }
+        else
+        {
+            let (sin, cos) = self.re().sin_cos();
+            Self::new(sin * self.im().cosh(), cos * self.im().sinh())
+        }
+    }
+    
+    fn cos(self) -> Self
+    {
+        if cfg!(target_arch = "spirv")
+        {
+            self.as_complex32().cos().as_complex64()
+        }
+        else
+        {
+            let (sin, cos) = self.re().sin_cos();
+            Self::new(cos * self.im().cosh(), -sin * self.im().sinh())
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct Complex32(Vec2);
@@ -436,33 +463,6 @@ impl Complex32
         Self::new(self.re(), -self.im())
     }
 
-    pub fn squared(self) -> Self
-    {
-        Self::new(self.re() * self.re() - self.im() * self.im(), 2.0 * self.re() * self.im())
-    }
-
-    pub fn exp(self) -> Self
-    {
-        Self::from_polar(self.re().exp(), self.im())
-    }
-
-    pub fn ln(self) -> Self
-    {
-        Self::new(self.modulus().ln(), self.argument())
-    }
-    
-    pub fn sin(self) -> Self
-    {
-        let (sin, cos) = self.re().sin_cos();
-        Self::new(sin * self.im().cosh(), cos * self.im().sinh())
-    }
-    
-    pub fn cos(self) -> Self
-    {
-        let (sin, cos) = self.re().sin_cos();
-        Self::new(cos * self.im().cosh(), -sin * self.im().sinh())
-    }
-
     pub fn as_complex64(self) -> Complex
     {
         Complex::from(self.0.as_dvec2())
@@ -471,6 +471,43 @@ impl Complex32
     pub fn fuzzy_eq(self, rhs: Self, max_abs_diff: f32) -> bool
     {
         (self - rhs).0.abs().cmple(Vec2::splat(max_abs_diff)).all()
+    }
+}
+
+impl super::Exp for Complex32
+{
+    fn squared(self) -> Self
+    {
+        Self::new(self.re() * self.re() - self.im() * self.im(), 2.0 * self.re() * self.im())
+    }
+
+    fn sqrt(self) -> Self
+    {
+        // In polar coordinate: Self::from_polar(modulus.sqrt(), arg / 2.0)
+
+        let modulus = self.modulus();
+        let sgn = if self.im() < 0.0 { -1.0 } else { 1.0 };
+        Self::new((modulus + self.re()) / 2.0, sgn * (modulus - self.re()) / 2.0)
+    }
+
+    fn exp(self) -> Self
+    {
+        Self::from_polar(Exp::exp(self.re()), self.im())
+    }
+
+    fn pow(self, exp: Self) -> Self
+    {
+        (exp * self.ln()).exp()
+    }
+
+    fn ln(self) -> Self
+    {
+        Self::new(Exp::ln(self.modulus()), self.argument())
+    }
+
+    fn log(self, base: Self) -> Self
+    {
+        self.ln() / base.ln()
     }
 }
 
@@ -638,5 +675,20 @@ impl<'a> Product<&'a Self> for Complex32
         I: Iterator<Item = &'a Self>,
     {
         iter.fold(Self::ONE, |a, &b| a * b)
+    }
+}
+
+impl Trigo for Complex32
+{
+    fn sin(self) -> Self
+    {
+        let (sin, cos) = self.re().sin_cos();
+        Self::new(sin * self.im().cosh(), cos * self.im().sinh())
+    }
+    
+    fn cos(self) -> Self
+    {
+        let (sin, cos) = self.re().sin_cos();
+        Self::new(cos * self.im().cosh(), -sin * self.im().sinh())
     }
 }

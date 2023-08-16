@@ -1,7 +1,7 @@
 use num_traits::{Float, Zero, One, Inv, Pow, NumCast};
 use core::ops::{Add, Sub, Mul, Div, Neg};
 
-use super::{Complex, Complex32};
+use super::{Complex, Complex32, Exp as ExpTrait, Trigo};
 
 
 pub trait Function<I>
@@ -449,7 +449,7 @@ impl Func<Exp>
 	pub const EXP: Self = Func(Exp);
 }
 
-impl<I: Float> Function<I> for Exp
+impl<I: ExpTrait> Function<I> for Exp
 {
 	type Output = I;
 	
@@ -478,7 +478,7 @@ impl Func<Ln>
 	pub const LN: Self = Func(Ln);
 }
 
-impl<I: Float> Function<I> for Ln
+impl<I: ExpTrait> Function<I> for Ln
 {
 	type Output = I;
 	
@@ -507,7 +507,7 @@ impl Func<Sqrt>
 	pub const SQRT: Self = Func(Sqrt);
 }
 
-impl<I: Float> Function<I> for Sqrt
+impl<I: ExpTrait> Function<I> for Sqrt
 {
 	type Output = I;
 	
@@ -517,7 +517,7 @@ impl<I: Float> Function<I> for Sqrt
 	}
 }
 
-impl<I: Float> Differentiable<I> for Sqrt
+impl<I: NumCast> Differentiable<I> for Sqrt
 {
 	type Derivative = Division<Constant<I>, Self>;
 
@@ -609,7 +609,7 @@ impl Func<Sin>
 	pub const SIN: Self = Func(Sin);
 }
 
-impl<I: Float> Function<I> for Sin
+impl<I: Trigo> Function<I> for Sin
 {
 	type Output = I;
 	
@@ -619,7 +619,7 @@ impl<I: Float> Function<I> for Sin
 	}
 }
 
-impl<I: Float> Differentiable<I> for Sin
+impl<I> Differentiable<I> for Sin
 {
 	type Derivative = Cos;
 
@@ -638,7 +638,7 @@ impl Func<Cos>
 	pub const COS: Self = Func(Cos);
 }
 
-impl<I: Float> Function<I> for Cos
+impl<I: Trigo> Function<I> for Cos
 {
 	type Output = I;
 	
@@ -648,7 +648,7 @@ impl<I: Float> Function<I> for Cos
 	}
 }
 
-impl<I: Float> Differentiable<I> for Cos
+impl<I> Differentiable<I> for Cos
 {
 	type Derivative = Negative<Sin>;
 
@@ -677,7 +677,7 @@ impl<I: Float> Function<I> for Tan
 	}
 }
 
-impl<I: Float> Differentiable<I> for Tan
+impl<I> Differentiable<I> for Tan
 {
 	type Derivative = Inverse<Product<Cos, Cos>>;
 

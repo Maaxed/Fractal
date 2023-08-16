@@ -1,4 +1,4 @@
-use crate::math::Complex;
+use crate::math::{Complex, Trigo};
 use super::escape_time_method::*;
 
 const ITERATION_COUNT: u32 = 1024;

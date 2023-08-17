@@ -1,4 +1,4 @@
-use num_traits::{Float, Zero, One, Inv, Pow, NumCast};
+use num_traits::{Float, Zero, One, Inv, Pow};
 use core::ops::{Add, Sub, Mul, Div, Neg};
 
 use super::{Complex, Complex32, Exp as ExpTrait, Trigo};
@@ -62,6 +62,11 @@ impl<F> Func<F>
 	pub fn log<B>(self, base: Func<B>) -> Func<Division<Composition<Ln, F>, Composition<Ln, B>>>
 	{
 		self.ln() / base.ln()
+	}
+
+	pub fn squared(self) -> Func<Composition<Squared, F>>
+	{
+		Func::SQUARED.compose(self)
 	}
 
 	pub fn sqrt(self) -> Func<Composition<Sqrt, F>>
@@ -500,6 +505,37 @@ impl<I> Differentiable<I> for Ln
 
 
 #[derive(Debug, Copy, Clone)]
+pub struct Squared;
+
+impl Func<Squared>
+{
+	pub const SQUARED: Self = Func(Squared);
+}
+
+impl<I: ExpTrait> Function<I> for Squared
+{
+	type Output = I;
+	
+	fn get(&self, x: I) -> Self::Output
+	{
+		x.squared()
+	}
+}
+
+impl<I> Differentiable<I> for Squared
+where
+	u32: Into<I>
+{
+	type Derivative = Product<Constant<I>, Identity>;
+
+	fn derivative(&self) -> Func<Self::Derivative>
+	{
+		Func::constant(2.into()) * Func::IDENTITY
+	}
+}
+
+
+#[derive(Debug, Copy, Clone)]
 pub struct Sqrt;
 
 impl Func<Sqrt>
@@ -517,13 +553,15 @@ impl<I: ExpTrait> Function<I> for Sqrt
 	}
 }
 
-impl<I: NumCast> Differentiable<I> for Sqrt
+impl<I: From<f32>> Differentiable<I> for Sqrt
+where
+	f32: Into<I>
 {
 	type Derivative = Division<Constant<I>, Self>;
 
 	fn derivative(&self) -> Func<Self::Derivative>
 	{
-		Func::constant(NumCast::from(0.5).unwrap()) / Func(*self)
+		Func::constant(0.5.into()) / Func(*self)
 	}
 }
 

@@ -60,6 +60,35 @@ impl One for Complex
     }
 }
 
+impl From<f64> for Complex
+{
+    fn from(value: f64) -> Self
+    {
+        Self::new(value, 0.0)
+    }
+}
+
+macro_rules! complex_from_primitive
+{
+    ($t:ty) =>
+    {
+        impl From<$t> for Complex
+        {
+            fn from(value: $t) -> Self
+            {
+                (value as f64).into()
+            }
+        }
+    };
+}
+
+complex_from_primitive!(f32);
+complex_from_primitive!(u32);
+complex_from_primitive!(u64);
+complex_from_primitive!(i32);
+complex_from_primitive!(i64);
+
+
 // Some operations are not available for f64 when compiling to spirv, so the f32 implementation is called instead
 impl Complex
 {
@@ -413,6 +442,34 @@ impl Default for Complex32
         Self::ZERO
     }
 }
+
+impl From<f32> for Complex32
+{
+    fn from(value: f32) -> Self
+    {
+        Self::new(value, 0.0)
+    }
+}
+
+macro_rules! complex_from_primitive
+{
+    ($t:ty) =>
+    {
+        impl From<$t> for Complex32
+        {
+            fn from(value: $t) -> Self
+            {
+                (value as f32).into()
+            }
+        }
+    };
+}
+
+complex_from_primitive!(f64);
+complex_from_primitive!(u32);
+complex_from_primitive!(u64);
+complex_from_primitive!(i32);
+complex_from_primitive!(i64);
 
 impl Complex32
 {

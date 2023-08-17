@@ -4,6 +4,7 @@ pub mod multibrot;
 pub mod tricorn;
 pub mod burning_ship;
 pub mod cos_leaf;
+pub mod newton;
 pub mod lyapunov;
 
 use crate::math::*;
@@ -26,6 +27,7 @@ pub enum FractalKind
     MandelbrotNormal,
 
     // Other
+    Newton3,
     Lyapunov,
 }
 
@@ -88,6 +90,7 @@ pub fn compute_fractal_color(pos: Complex, params: FractalParams) -> Vec3
                 },
             };
         },
+        FractalKind::Newton3 => return newton::newton3(pos, params),
         FractalKind::Lyapunov =>
         {
             let v = lyapunov::lyapunov(&[false, true], pos.into());

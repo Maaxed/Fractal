@@ -1,7 +1,7 @@
 use num_traits::{Float, Zero, One, Inv, Pow};
 use core::ops::{Add, Sub, Mul, Div, Neg};
 
-use super::{Complex, Complex32, Exp as ExpTrait, Trigo};
+use super::{Complex64, Complex32, Exp as ExpTrait, Trigo};
 
 
 pub trait Function<I>
@@ -757,9 +757,9 @@ impl IntoFunc for f64
 	}
 }
 
-impl IntoFunc for Complex
+impl IntoFunc for Complex64
 {
-	type Type = Constant<Complex>;
+	type Type = Constant<Complex64>;
 	
 	fn into_func(self) -> Func<Self::Type>
 	{

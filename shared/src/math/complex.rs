@@ -5,33 +5,77 @@ use core::iter::{Product, Sum};
 use bytemuck::NoUninit;
 use num_traits::{Zero, One};
 
-use super::{Exp, Trigo};
+use super::{Exp, Trigo, Scalar};
 
 #[cfg(target_arch = "spirv")]
 use num_traits::Float;
 
+pub trait ComplexNumber:
+    From<<Self::Scalar as Scalar>::Vector2> + Into<<Self::Scalar as Scalar>::Vector2>
+    + PartialEq
+    + Add<Output = Self>
+    + Sub<Output = Self>
+    + Mul<Output = Self>
+    + Div<Output = Self>
+{
+    type Scalar: Scalar;
+
+    const ZERO: Self;
+    const ONE: Self;
+    const I: Self;
+
+    fn from_cartesian(real: Self::Scalar, imaginary: Self::Scalar) -> Self;
+
+    fn from_polar(modulus: Self::Scalar, argument: Self::Scalar) -> Self;
+
+    /// The real part of the complex number
+    fn re(self) -> Self::Scalar;
+
+    fn re_mut(&mut self) -> &mut Self::Scalar;
+
+    /// The imaginary part of the complex number
+    fn im(self) -> Self::Scalar;
+
+    fn im_mut(&mut self) -> &mut Self::Scalar;
+
+    #[doc(alias = "magnitude")]
+    fn modulus(self) -> Self::Scalar;
+
+    fn modulus_squared(self) -> Self::Scalar;
+
+    fn argument(self) -> Self::Scalar;
+
+    fn conjugate(self) -> Self;
+
+    fn fuzzy_eq(self, rhs: Self, max_abs_diff: Self::Scalar) -> bool;
+    
+    fn to_complex32(self) -> Complex32;
+    
+    fn to_complex64(self) -> Complex64;
+}
+
 #[repr(C)]
 #[cfg_attr(feature = "bytemuck", derive(Debug, NoUninit))]
 #[derive(Clone, Copy, PartialEq)]
-pub struct Complex(DVec2);
+pub struct Complex64(DVec2);
 
-impl From<DVec2> for Complex
+impl From<DVec2> for Complex64
 {
     fn from(value: DVec2) -> Self
     {
-        Complex(value)
+        Complex64(value)
     }
 }
 
-impl From<Complex> for DVec2
+impl From<Complex64> for DVec2
 {
-    fn from(value: Complex) -> Self
+    fn from(value: Complex64) -> Self
     {
         value.0
     }
 }
 
-impl Default for Complex
+impl Default for Complex64
 {
     fn default() -> Self
     {
@@ -39,7 +83,7 @@ impl Default for Complex
     }
 }
 
-impl Zero for Complex
+impl Zero for Complex64
 {
     fn zero() -> Self
     {
@@ -52,7 +96,7 @@ impl Zero for Complex
     }
 }
 
-impl One for Complex
+impl One for Complex64
 {
     fn one() -> Self
     {
@@ -60,7 +104,7 @@ impl One for Complex
     }
 }
 
-impl From<f64> for Complex
+impl From<f64> for Complex64
 {
     fn from(value: f64) -> Self
     {
@@ -68,11 +112,11 @@ impl From<f64> for Complex
     }
 }
 
-macro_rules! complex_from_primitive
+macro_rules! complex64_from_primitive
 {
     ($t:ty) =>
     {
-        impl From<$t> for Complex
+        impl From<$t> for Complex64
         {
             fn from(value: $t) -> Self
             {
@@ -82,30 +126,40 @@ macro_rules! complex_from_primitive
     };
 }
 
-complex_from_primitive!(f32);
-complex_from_primitive!(u32);
-complex_from_primitive!(u64);
-complex_from_primitive!(i32);
-complex_from_primitive!(i64);
+complex64_from_primitive!(f32);
+complex64_from_primitive!(u32);
+complex64_from_primitive!(u64);
+complex64_from_primitive!(i32);
+complex64_from_primitive!(i64);
 
 
 // Some operations are not available for f64 when compiling to spirv, so the f32 implementation is called instead
-impl Complex
+impl Complex64
 {
-    pub const ZERO: Self = Self::new(0.0, 0.0);
-    pub const ONE: Self = Self::new(1.0, 0.0);
-    pub const I: Self = Self::new(0.0, 1.0);
-
     pub const fn new(real: f64, imaginary: f64) -> Self
     {
         Self(DVec2::new(real, imaginary))
     }
+}
 
-    pub fn from_polar(modulus: f64, argument: f64) -> Self
+impl ComplexNumber for Complex64
+{
+    type Scalar = f64;
+
+    const ZERO: Self = Self::new(0.0, 0.0);
+    const ONE: Self = Self::new(1.0, 0.0);
+    const I: Self = Self::new(0.0, 1.0);
+    
+    fn from_cartesian(real: f64, imaginary: f64) -> Self
+    {
+        Self::new(real, imaginary)
+    }
+
+    fn from_polar(modulus: f64, argument: f64) -> Self
     {
         if cfg!(target_arch = "spirv")
         {
-            Complex32::from_polar(modulus as f32, argument as f32).as_complex64()
+            Complex32::from_polar(modulus as f32, argument as f32).to_complex64()
         }
         else
         {
@@ -115,60 +169,65 @@ impl Complex
     }
 
     /// The real part of the complex number
-    pub fn re(self) -> f64
+    fn re(self) -> f64
     {
         self.0.x
     }
 
-    pub fn re_mut(&mut self) -> &mut f64
+    fn re_mut(&mut self) -> &mut f64
     {
         &mut self.0.x
     }
 
     /// The imaginary part of the complex number
-    pub fn im(self) -> f64
+    fn im(self) -> f64
     {
         self.0.y
     }
 
-    pub fn im_mut(&mut self) -> &mut f64
+    fn im_mut(&mut self) -> &mut f64
     {
         &mut self.0.y
     }
 
     #[doc(alias = "magnitude")]
-    pub fn modulus(self) -> f64
+    fn modulus(self) -> f64
     {
         self.0.length()
     }
 
-    pub fn modulus_squared(self) -> f64
+    fn modulus_squared(self) -> f64
     {
         self.0.length_squared()
     }
 
-    pub fn argument(self) -> f64
+    fn argument(self) -> f64
     {
         self.im().atan2(self.re())
     }
 
-    pub fn conjugate(self) -> Self
+    fn conjugate(self) -> Self
     {
         Self::new(self.re(), -self.im())
     }
 
-    pub fn as_complex32(self) -> Complex32
-    {
-        Complex32::from(self.0.as_vec2())
-    }
-
-    pub fn fuzzy_eq(self, rhs: Self, max_abs_diff: f64) -> bool
+    fn fuzzy_eq(self, rhs: Self, max_abs_diff: f64) -> bool
     {
         (self - rhs).0.abs().cmple(DVec2::splat(max_abs_diff)).all()
     }
+    
+    fn to_complex32(self) -> Complex32
+    {
+        Complex32::from(self.0.as_vec2())
+    }
+    
+    fn to_complex64(self) -> Self
+    {
+        self
+    }
 }
 
-impl Add<Complex> for Complex
+impl Add<Complex64> for Complex64
 {
     type Output = Self;
 
@@ -178,7 +237,7 @@ impl Add<Complex> for Complex
     }
 }
 
-impl AddAssign<Complex> for Complex
+impl AddAssign<Complex64> for Complex64
 {
     fn add_assign(&mut self, rhs: Self)
     {
@@ -186,7 +245,7 @@ impl AddAssign<Complex> for Complex
     }
 }
 
-impl Sub<Complex> for Complex
+impl Sub<Complex64> for Complex64
 {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self
@@ -195,15 +254,15 @@ impl Sub<Complex> for Complex
     }
 }
 
-impl SubAssign<Complex> for Complex
+impl SubAssign<Complex64> for Complex64
 {
-    fn sub_assign(&mut self, rhs: Complex)
+    fn sub_assign(&mut self, rhs: Complex64)
     {
         self.0 -= rhs.0;
     }
 }
 
-impl Neg for Complex
+impl Neg for Complex64
 {
     type Output = Self;
     
@@ -213,7 +272,7 @@ impl Neg for Complex
     }
 }
 
-impl Mul<Complex> for Complex
+impl Mul<Complex64> for Complex64
 {
     type Output = Self;
 
@@ -223,7 +282,7 @@ impl Mul<Complex> for Complex
     }
 }
 
-impl MulAssign<Complex> for Complex
+impl MulAssign<Complex64> for Complex64
 {
     fn mul_assign(&mut self, rhs: Self)
     {
@@ -231,7 +290,7 @@ impl MulAssign<Complex> for Complex
     }
 }
 
-impl Mul<f64> for Complex
+impl Mul<f64> for Complex64
 {
     type Output = Self;
 
@@ -241,7 +300,7 @@ impl Mul<f64> for Complex
     }
 }
 
-impl MulAssign<f64> for Complex
+impl MulAssign<f64> for Complex64
 {
     fn mul_assign(&mut self, rhs: f64)
     {
@@ -249,17 +308,17 @@ impl MulAssign<f64> for Complex
     }
 }
 
-impl Mul<Complex> for f64
+impl Mul<Complex64> for f64
 {
-    type Output = Complex;
+    type Output = Complex64;
     
-    fn mul(self, rhs: Complex) -> Complex
+    fn mul(self, rhs: Complex64) -> Complex64
     {
         (self * rhs.0).into()
     }
 }
 
-impl Div<Complex> for Complex
+impl Div<Complex64> for Complex64
 {
     type Output = Self;
     
@@ -269,7 +328,7 @@ impl Div<Complex> for Complex
     }
 }
 
-impl DivAssign<Complex> for Complex
+impl DivAssign<Complex64> for Complex64
 {
     fn div_assign(&mut self, rhs: Self)
     {
@@ -277,7 +336,7 @@ impl DivAssign<Complex> for Complex
     }
 }
 
-impl Div<f64> for Complex
+impl Div<f64> for Complex64
 {
     type Output = Self;
     
@@ -287,7 +346,7 @@ impl Div<f64> for Complex
     }
 }
 
-impl DivAssign<f64> for Complex
+impl DivAssign<f64> for Complex64
 {
     fn div_assign(&mut self, rhs: f64)
     {
@@ -295,7 +354,7 @@ impl DivAssign<f64> for Complex
     }
 }
 
-impl Sum for Complex
+impl Sum for Complex64
 {
     fn sum<I>(iter: I) -> Self
     where
@@ -305,7 +364,7 @@ impl Sum for Complex
     }
 }
 
-impl<'a> Sum<&'a Self> for Complex
+impl<'a> Sum<&'a Self> for Complex64
 {
     fn sum<I>(iter: I) -> Self
     where
@@ -315,7 +374,7 @@ impl<'a> Sum<&'a Self> for Complex
     }
 }
 
-impl Product for Complex
+impl Product for Complex64
 {
     fn product<I>(iter: I) -> Self
     where
@@ -325,7 +384,7 @@ impl Product for Complex
     }
 }
 
-impl<'a> Product<&'a Self> for Complex
+impl<'a> Product<&'a Self> for Complex64
 {
     fn product<I>(iter: I) -> Self
     where
@@ -335,7 +394,7 @@ impl<'a> Product<&'a Self> for Complex
     }
 }
 
-impl Exp for Complex
+impl Exp for Complex64
 {
     fn squared(self) -> Self
     {
@@ -355,7 +414,7 @@ impl Exp for Complex
     {
         if cfg!(target_arch = "spirv")
         {
-            self.as_complex32().exp().as_complex64()
+            self.to_complex32().exp().to_complex64()
         }
         else
         {
@@ -372,7 +431,7 @@ impl Exp for Complex
     {
         if cfg!(target_arch = "spirv")
         {
-            self.as_complex32().ln().as_complex64()
+            self.to_complex32().ln().to_complex64()
         }
         else
         {
@@ -386,13 +445,13 @@ impl Exp for Complex
     }
 }
 
-impl super::Trigo for Complex
+impl super::Trigo for Complex64
 {
     fn sin(self) -> Self
     {
         if cfg!(target_arch = "spirv")
         {
-            self.as_complex32().sin().as_complex64()
+            self.to_complex32().sin().to_complex64()
         }
         else
         {
@@ -405,7 +464,7 @@ impl super::Trigo for Complex
     {
         if cfg!(target_arch = "spirv")
         {
-            self.as_complex32().cos().as_complex64()
+            self.to_complex32().cos().to_complex64()
         }
         else
         {
@@ -473,61 +532,86 @@ complex_from_primitive!(i64);
 
 impl Complex32
 {
-    pub const ZERO: Self = Self::new(0.0, 0.0);
-    pub const ONE: Self = Self::new(1.0, 0.0);
-    pub const I: Self = Self::new(0.0, 1.0);
-
     pub const fn new(real: f32, imaginary: f32) -> Self
     {
         Self(Vec2::new(real, imaginary))
     }
+}
 
-    pub fn from_polar(modulus: f32, argument: f32) -> Self
+impl ComplexNumber for Complex32
+{
+    type Scalar = f32;
+
+    const ZERO: Self = Self::new(0.0, 0.0);
+    const ONE: Self = Self::new(1.0, 0.0);
+    const I: Self = Self::new(0.0, 1.0);
+
+    fn from_cartesian(real: f32, imaginary: f32) -> Self
+    {
+        Self::new(real, imaginary)
+    }
+
+    fn from_polar(modulus: f32, argument: f32) -> Self
     {
         Self::from(Vec2::from_angle(argument)) * modulus
     }
 
     /// The real part of the complex number
-    pub fn re(self) -> f32
+    fn re(self) -> f32
     {
         self.0.x
     }
 
+    fn re_mut(&mut self) -> &mut f32
+    {
+        &mut self.0.x
+    }
+
     /// The imaginary part of the complex number
-    pub fn im(self) -> f32
+    fn im(self) -> f32
     {
         self.0.y
     }
 
+    fn im_mut(&mut self) -> &mut f32
+    {
+        &mut self.0.y
+    }
+
     #[doc(alias = "magnitude")]
-    pub fn modulus(self) -> f32
+    fn modulus(self) -> f32
     {
         self.0.length()
     }
 
-    pub fn modulus_squared(self) -> f32
+    fn modulus_squared(self) -> f32
     {
         self.0.length_squared()
     }
 
-    pub fn argument(self) -> f32
+    fn argument(self) -> f32
     {
         self.im().atan2(self.re())
     }
 
-    pub fn conjugate(self) -> Self
+    fn conjugate(self) -> Self
     {
         Self::new(self.re(), -self.im())
     }
 
-    pub fn as_complex64(self) -> Complex
-    {
-        Complex::from(self.0.as_dvec2())
-    }
-
-    pub fn fuzzy_eq(self, rhs: Self, max_abs_diff: f32) -> bool
+    fn fuzzy_eq(self, rhs: Self, max_abs_diff: f32) -> bool
     {
         (self - rhs).0.abs().cmple(Vec2::splat(max_abs_diff)).all()
+    }
+
+    fn to_complex32(self) -> Complex32
+    {
+        self
+    }
+
+    fn to_complex64(self) -> Complex64
+    {
+        Complex64::from(self.0.as_dvec2())
     }
 }
 

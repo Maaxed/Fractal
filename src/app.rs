@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use fractal_renderer_shared as shared;
-use shared::math::Complex;
+use shared::math::{Complex, ComplexNumber};
 use shared::fractal::{FractalKind, FractalVariation};
 use glam::{dvec2, DVec2, i64vec2};
 use winit::dpi::{PhysicalPosition, PhysicalSize};

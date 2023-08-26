@@ -3,11 +3,10 @@ pub mod function;
 
 pub use function::{Func, Function, Differentiable};
 
-pub use complex::ComplexNumber;
+pub use complex::*;
 
-use complex::*;
 use glam::{Vec2 as FVec2, DVec2};
-use num_traits::{Float, Pow};
+use num_traits::{Float, Pow, Inv, AsPrimitive, NumAssign};
 use core::ops::*;
 
 pub trait Exp
@@ -113,15 +112,21 @@ pub fn abs(v: f32) -> f32
     v.abs()
 }
 
-pub trait Scalar: Float + Exp + Trigo
+pub trait Scalar:
+    Float + NumAssign
+    + Exp
+    + Trigo
+    + From<f32>
+    + AsPrimitive<f32>
+    + AsPrimitive<f64>
+    + Inv<Output = Self>
 {
-    type Vector2: Vector;
-    type Complex: ComplexNumber;
+    type Vector2: Vector<Scalar = Self>;
+    type Complex: ComplexNumber<Scalar = Self>;
 }
 
 pub type Vec2<S> = <S as Scalar>::Vector2;
-//pub type Complex<S> = <S as Scalar>::Complex;
-pub type Complex = Complex64;
+pub type Complex<S> = <S as Scalar>::Complex;
 
 impl Scalar for f32
 {
@@ -136,15 +141,69 @@ impl Scalar for f64
 }
 
 pub trait Vector:
-    Sized
+    Copy
     + Add<Output = Self> + AddAssign
     + Sub<Output = Self> + SubAssign
     + Mul<Output = Self> + MulAssign
     + Div<Output = Self> + DivAssign
-{ }
+{
+    type Scalar: Scalar<Vector2 = Self>;
+
+    fn x(self) -> Self::Scalar;
+
+    fn y(self) -> Self::Scalar;
+
+    fn abs(self) -> Self;
+
+    fn dot(self, rhs: Self) -> Self::Scalar;
+}
 
 impl Vector for FVec2
-{ }
+{
+    type Scalar = f32;
+
+    fn x(self) -> Self::Scalar
+    {
+        self.x
+    }
+    
+    fn y(self) -> Self::Scalar
+    {
+        self.y
+    }
+
+    fn abs(self) -> Self
+    {
+        FVec2::abs(self)
+    }
+
+    fn dot(self, rhs: Self) -> Self::Scalar
+    {
+        FVec2::dot(self, rhs)
+    }
+}
 
 impl Vector for DVec2
-{ }
+{
+    type Scalar = f64;
+
+    fn x(self) -> Self::Scalar
+    {
+        self.x
+    }
+    
+    fn y(self) -> Self::Scalar
+    {
+        self.y
+    }
+
+    fn abs(self) -> Self
+    {
+        DVec2::abs(self)
+    }
+
+    fn dot(self, rhs: Self) -> Self::Scalar
+    {
+        DVec2::dot(self, rhs)
+    }
+}

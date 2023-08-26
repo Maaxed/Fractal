@@ -461,7 +461,38 @@ dependencies = [
 ]
 
 [[package]]
-name = "fractal_renderer_shader"
+name = "fractal_renderer_shader_compute32"
+version = "0.1.0"
+dependencies = [
+ "fractal_renderer_shared",
+ "spirv-std",
+]
+
+[[package]]
+name = "fractal_renderer_shader_compute64"
+version = "0.1.0"
+dependencies = [
+ "fractal_renderer_shared",
+ "spirv-std",
+]
+
+[[package]]
+name = "fractal_renderer_shader_fragment"
+version = "0.1.0"
+dependencies = [
+ "spirv-std",
+]
+
+[[package]]
+name = "fractal_renderer_shader_vertex32"
+version = "0.1.0"
+dependencies = [
+ "fractal_renderer_shared",
+ "spirv-std",
+]
+
+[[package]]
+name = "fractal_renderer_shader_vertex64"
 version = "0.1.0"
 dependencies = [
  "fractal_renderer_shared",

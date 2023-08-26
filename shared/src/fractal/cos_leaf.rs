@@ -1,9 +1,9 @@
-use crate::math::{Complex, Trigo};
-use super::escape_time_method::*;
+use crate::math::*;
+use super::{escape_time_method::*, FractalParams};
 
 const ITERATION_COUNT: u32 = 1024;
 
-pub fn cos_leaf(pos: Complex, params: Params) -> EscapeResult
+pub fn cos_leaf<S: Scalar>(pos: Complex<S>, params: FractalParams<S>) -> EscapeResult
 {
     compute_escape_time(pos, params, ITERATION_COUNT, 100.0, None, |z, c|
     {

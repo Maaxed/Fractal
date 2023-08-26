@@ -1,3 +1,4 @@
+use fractal_renderer_shared as shared;
 use wgpu::{ComputePipeline, Buffer, BindGroup, CommandEncoder};
 use winit::dpi::PhysicalSize;
 
@@ -12,6 +13,7 @@ pub struct Compute
 struct Fixed
 {
     workgroup_size: glam::UVec2,
+    use_double_precision: bool,
     compute_pipeline: ComputePipeline,
     bind_group_layout: wgpu::BindGroupLayout,
     params_buffer: Buffer,
@@ -26,13 +28,22 @@ struct Dynamic
 
 impl Fixed
 {
-    fn new(target: &Target, shader_module: &wgpu::ShaderModule, workgroup_size: glam::UVec2) -> Self
+    fn new(target: &Target, shader_module: &wgpu::ShaderModule, workgroup_size: glam::UVec2, use_double_precision: bool) -> Self
     {
+        let data_size = if use_double_precision
+        {
+            std::mem::size_of::<shared::compute::Params64>()
+        }
+        else
+        {
+            std::mem::size_of::<shared::compute::Params32>()
+        };
+
         let params_buffer = target.device.create_buffer(
             &wgpu::BufferDescriptor
             {
                 label: Some("params"),
-                size: std::mem::size_of::<fractal_renderer_shared::ComputeParams>() as u64,
+                size: data_size as u64,
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
@@ -92,6 +103,7 @@ impl Fixed
             compute_pipeline,
             bind_group_layout,
             params_buffer,
+            use_double_precision,
         }
     }
 }
@@ -147,9 +159,9 @@ impl Dynamic
 
 impl Compute
 {
-    pub fn new(target: &Target, shader_module: &wgpu::ShaderModule, workgroup_size: glam::UVec2, texture_size: PhysicalSize<u32>) -> Self
+    pub fn new(target: &Target, shader_module: &wgpu::ShaderModule, workgroup_size: glam::UVec2, texture_size: PhysicalSize<u32>, use_double_precision: bool) -> Self
     {
-        let fixed = Fixed::new(target, shader_module, workgroup_size);
+        let fixed = Fixed::new(target, shader_module, workgroup_size, use_double_precision);
         let dynamic = Dynamic::new(target, &fixed, texture_size);
 
         Self
@@ -175,10 +187,18 @@ impl Compute
     pub fn set_params(
         &self,
         queue: &wgpu::Queue,
-        params: &fractal_renderer_shared::ComputeParams
+        params: &shared::compute::Params64
     )
     {
-        queue.write_buffer(&self.fixed.params_buffer, 0, bytemuck::bytes_of(params));
+        if self.fixed.use_double_precision
+        {
+            queue.write_buffer(&self.fixed.params_buffer, 0, bytemuck::bytes_of(params));
+        }
+        else
+        {
+            let params: shared::compute::Params32 = (*params).into();
+            queue.write_buffer(&self.fixed.params_buffer, 0, bytemuck::bytes_of(&params));
+        }
     }
 
     pub fn copy_buffer_to_texture(

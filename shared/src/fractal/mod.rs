@@ -41,24 +41,47 @@ pub enum FractalVariation
 }
 
 #[repr(C)]
-#[cfg_attr(feature = "bytemuck", derive(Debug, NoUninit))]
+#[cfg_attr(feature = "bytemuck", derive(NoUninit))]
 #[derive(Copy, Clone)]
-pub struct FractalParams
+pub struct FractalParams32
 {
-    pub secondary_pos: Complex,
+    pub secondary_pos: Complex32,
+    pub fractal_kind: FractalKind,
+    pub variation: FractalVariation,
+}
+
+impl Default for FractalParams32
+{
+    fn default() -> Self
+    {
+        Self
+        {
+            secondary_pos: Complex32::ZERO,
+            fractal_kind: FractalKind::MandelbrotSet,
+            variation: FractalVariation::Normal,
+        }
+    }
+}
+
+#[repr(C)]
+#[cfg_attr(feature = "bytemuck", derive(NoUninit))]
+#[derive(Copy, Clone)]
+pub struct FractalParams64
+{
+    pub secondary_pos: Complex64,
     pub fractal_kind: FractalKind,
     pub variation: FractalVariation,
     padding0: u32,
     padding1: u32,
 }
 
-impl Default for FractalParams
+impl Default for FractalParams64
 {
     fn default() -> Self
     {
         Self
         {
-            secondary_pos: Complex::ZERO,
+            secondary_pos: Complex64::ZERO,
             fractal_kind: FractalKind::MandelbrotSet,
             variation: FractalVariation::Normal,
             padding0: Default::default(),
@@ -67,18 +90,66 @@ impl Default for FractalParams
     }
 }
 
-pub fn compute_fractal_color(pos: Complex, params: FractalParams) -> Vec3
+impl From<FractalParams64> for FractalParams32
+{
+    fn from(value: FractalParams64) -> Self
+    {
+        Self
+        {
+            secondary_pos: value.secondary_pos.to_complex32(),
+            fractal_kind: value.fractal_kind,
+            variation: value.variation,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct FractalParams<S: Scalar>
+{
+    pub secondary_pos: Complex<S>,
+    pub fractal_kind: FractalKind,
+    pub variation: FractalVariation,
+}
+
+impl From<FractalParams32> for FractalParams<f32>
+{
+    fn from(value: FractalParams32) -> Self
+    {
+        Self
+        {
+            secondary_pos: value.secondary_pos,
+            fractal_kind: value.fractal_kind,
+            variation: value.variation,
+        }
+    }
+}
+
+impl From<FractalParams64> for FractalParams<f64>
+{
+    fn from(value: FractalParams64) -> Self
+    {
+        Self
+        {
+            secondary_pos: value.secondary_pos,
+            fractal_kind: value.fractal_kind,
+            variation: value.variation,
+        }
+    }
+}
+
+pub fn compute_fractal_color<S: Scalar>(pos: Complex<S>, params: FractalParams<S>) -> Vec3
 {
     let res = match params.fractal_kind
     {
-        FractalKind::MandelbrotSet => mandelbrot::mandelbrot_value(pos, params.into()),
-        FractalKind::Multibrot3 => multibrot::multibrot3(pos, params.into()),
-        FractalKind::Tricorn => tricorn::tricorn(pos, params.into()),
-        FractalKind::BurningShip => burning_ship::burning_ship(pos, params.into()),
-        FractalKind::CosLeaf => cos_leaf::cos_leaf(pos, params.into()),
+        FractalKind::MandelbrotSet => mandelbrot::mandelbrot_value(pos, params),
+        FractalKind::Multibrot3 => multibrot::multibrot3(pos, params),
+        FractalKind::Tricorn => tricorn::tricorn(pos, params),
+        FractalKind::BurningShip => burning_ship::burning_ship(pos, params),
+        FractalKind::CosLeaf => cos_leaf::cos_leaf(pos, params),
         FractalKind::MandelbrotNormal =>
         {
-            let res = mandelbrot::mandelbrot_value_normal(pos, params.into());
+            let res = mandelbrot::mandelbrot_value_normal(pos, params);
 
             return match res
             {
@@ -93,7 +164,7 @@ pub fn compute_fractal_color(pos: Complex, params: FractalParams) -> Vec3
         FractalKind::Newton3 => return newton::newton3(pos, params),
         FractalKind::Lyapunov =>
         {
-            let v = lyapunov::lyapunov(&[false, true], pos.into());
+            let v = lyapunov::lyapunov::<S, 2>(&[false, true], pos.to_vector());
             let y: f32 = if v >= 0.0 { 0.0 } else { sqrt(exp(v)) };
             let r = y;
             let g = 1.0 - pow(1.0 - y, 0.55);

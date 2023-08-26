@@ -1,14 +1,27 @@
 [package]
 name = "fractal_renderer"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [workspace]
-members = ["shader", "shared"]
+members = [
+    "shader/vertex32",
+    "shader/vertex64",
+    "shader/fragment",
+    "shader/compute32",
+    "shader/compute64",
+    "shared"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
 
 [workspace.dependencies]
 glam = { version = "0.24", default-features = false }
 bytemuck = { version = "1.13", features = ["derive"] }
+spirv-std = "0.8"
+fractal_renderer_shared = { path = "./shared" }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -28,5 +41,5 @@ wgpu = { version = "0.16", features = ["spirv", "vulkan-portability"] }
 winit = "0.28.6"
 glam = { workspace = true, default-features = true, features = ["bytemuck"] }
 bytemuck = { workspace = true }
-fractal_renderer_shared = { path = "./shared", features = ["bytemuck"] }
+fractal_renderer_shared = { workspace = true, features = ["bytemuck"] }
 env_logger = "0.10"

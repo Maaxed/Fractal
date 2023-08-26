@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use fractal_renderer_shared as shared;
-use shared::math::{Complex, ComplexNumber};
+use shared::math::*;
 use shared::fractal::{FractalKind, FractalVariation};
 use glam::{dvec2, DVec2, i64vec2};
 use winit::dpi::{PhysicalPosition, PhysicalSize};
@@ -10,7 +10,11 @@ use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCo
 
 use crate::quad_cell::QuadPos;
 
-const SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader.spv"));
+const VERTEX32_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_vertex32.spv"));
+const VERTEX64_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_vertex64.spv"));
+const FRAGMENT_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_fragment.spv"));
+const COMPUTE32_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_compute32.spv"));
+const COMPUTE64_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_compute64.spv"));
 
 pub struct App
 {
@@ -22,7 +26,7 @@ pub struct App
     pos: DVec2,
     zoom: f64,
 	secondary_zoom: f64,
-	fractal_params: shared::fractal::FractalParams,
+	fractal_params: shared::fractal::FractalParams64,
 	prev_mouse_pos: Option<PhysicalPosition<f64>>,
 	mouse_left_down: bool,
 	mouse_right_down: bool,
@@ -33,18 +37,44 @@ impl App
 {
 	pub fn new(target: crate::Target) -> Self
 	{
-        let shader_module = target.device.create_shader_module(
+		let use_double_precision = target.device.features().contains(wgpu::Features::SHADER_F64);
+
+		let (vertex_shader_code, fragment_shader_code, compute_shader_code) =
+			if use_double_precision
+			{
+				(VERTEX64_SHADER_CODE, FRAGMENT_SHADER_CODE, COMPUTE64_SHADER_CODE)
+			}
+			else
+			{
+				(VERTEX32_SHADER_CODE, FRAGMENT_SHADER_CODE, COMPUTE32_SHADER_CODE)
+			};
+		
+        let vertex_shader_module = target.device.create_shader_module(
             wgpu::ShaderModuleDescriptor
             {
-                label: None,
-                source: wgpu::util::make_spirv(SHADER_CODE),
+                label: Some("vertex_shader"),
+                source: wgpu::util::make_spirv(vertex_shader_code),
+            });
+		
+        let fragment_shader_module = target.device.create_shader_module(
+            wgpu::ShaderModuleDescriptor
+            {
+                label: Some("fragment_shader"),
+                source: wgpu::util::make_spirv(fragment_shader_code),
+            });
+		
+        let compute_shader_module = target.device.create_shader_module(
+            wgpu::ShaderModuleDescriptor
+            {
+                label: Some("compute_shader"),
+                source: wgpu::util::make_spirv(compute_shader_code),
             });
 		
 		let workgroup_size = glam::uvec2(16, 16);
 		let cell_size = PhysicalSize::new(256, 256);
-    	let compute = crate::compute::Compute::new(&target, &shader_module, workgroup_size, cell_size);
+    	let compute = crate::compute::Compute::new(&target, &compute_shader_module, workgroup_size, cell_size, use_double_precision);
 		
-		let render = crate::render::Render::new(&target, &shader_module, cell_size);
+		let render = crate::render::Render::new(&target, &vertex_shader_module, &fragment_shader_module, cell_size, use_double_precision);
 
 		Self
 		{
@@ -133,14 +163,14 @@ impl App
 
 		let cell = self.render.make_instance(&self.target);
 
-		cell.set_data(&self.target.queue, &shared::render::Instance
+		cell.set_data(&self.target.queue, &shared::render::Instance64
 		{
 			pos: cell_pos,
 			size: DVec2::splat(cell_size),
 		});
 
 		// Compute
-		self.compute.set_params(&self.target.queue, &shared::ComputeParams
+		self.compute.set_params(&self.target.queue, &shared::compute::Params64
 		{
 			min_pos: cell_pos + dvec2(0.0, cell_size),
 			max_pos: cell_pos + dvec2(cell_size, 0.0),
@@ -194,7 +224,7 @@ impl App
 		let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
 		let scale = 2.0 / self.viewport_world_size();
-		self.render.set_uniforms(&self.target.queue, &shared::render::Uniforms
+		self.render.set_uniforms(&self.target.queue, &shared::render::Uniforms64
 			{
 				camera_pos: self.pos,
 				world_to_view_scale: scale,
@@ -307,7 +337,7 @@ impl App
 										FractalVariation::Normal => FractalVariation::JuliaSet,
 										FractalVariation::JuliaSet => FractalVariation::Normal,
 									});
-									(self.pos, self.fractal_params.secondary_pos) = (self.fractal_params.secondary_pos.into(), self.pos.into());
+									(self.pos, self.fractal_params.secondary_pos) = (self.fractal_params.secondary_pos.to_vector(), Complex64::from_vector(self.pos));
 									(self.zoom, self.secondary_zoom) = (self.secondary_zoom, self.zoom);
 								},
 								VirtualKeyCode::R =>
@@ -315,7 +345,7 @@ impl App
 									self.cells = BTreeMap::new();
 									self.pos = DVec2::ZERO;
 									self.zoom = 1.0;
-									self.fractal_params.secondary_pos = Complex::ZERO;
+									self.fractal_params.secondary_pos = Complex64::ZERO;
 									self.target.window.request_redraw();
 								},
 								_ => {},
@@ -356,7 +386,7 @@ impl App
 								else if self.mouse_right_down
 								{
 									self.cells.clear();
-									self.fractal_params.secondary_pos -= Complex::new(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size();
+									self.fractal_params.secondary_pos -= Complex64::new(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size();
 									self.target.window.request_redraw();
 								}
 							}

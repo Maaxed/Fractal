@@ -1,3 +1,4 @@
+use futures::TryFutureExt;
 use winit::{window::Window, event_loop::EventLoopWindowTarget, dpi::PhysicalSize};
 
 
@@ -27,18 +28,7 @@ impl Target
 			.await
 			.expect("Failed to find an appropriate adapter");
 
-		let (device, queue) = adapter
-			.request_device(
-				&wgpu::DeviceDescriptor
-				{
-					label: None,
-					features: wgpu::Features::SHADER_F64,
-					limits: wgpu::Limits::default(),
-				},
-				None,
-			)
-			.await
-			.expect("Failed to create device");
+		let (device, queue) = Self::request_device(&adapter).await.expect("Failed to find a compatible device");
 		
         let swapchain_capabilities: wgpu::SurfaceCapabilities = surface.get_capabilities(&adapter);
         let swapchain_format = swapchain_capabilities.formats[0];
@@ -67,6 +57,33 @@ impl Target
         this.configure_surface();
 
 		this
+	}
+
+	async fn request_device(adapter: &wgpu::Adapter) -> Result<(wgpu::Device, wgpu::Queue), wgpu::RequestDeviceError>
+	{
+		adapter
+			.request_device(
+				&wgpu::DeviceDescriptor
+				{
+					label: None,
+					features: wgpu::Features::SHADER_F64,
+					limits: wgpu::Limits::default(),
+				},
+				None,
+			)
+			.or_else(|_|
+			{
+				adapter
+					.request_device(
+						&wgpu::DeviceDescriptor
+						{
+							label: None,
+							features: wgpu::Features::empty(),
+							limits: wgpu::Limits::default(),
+						},
+						None,
+					)
+			}).await
 	}
 
 	pub fn configure_surface(&self)

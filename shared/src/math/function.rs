@@ -1,5 +1,5 @@
 use num_traits::{Float, Zero, One, Inv, Pow};
-use core::ops::{Add, Sub, Mul, Div, Neg};
+use core::ops::*;
 
 use super::{Complex64, Complex32, Exp as ExpTrait, Trigo};
 
@@ -104,7 +104,7 @@ pub trait IntoFunc
 }
 
 
-
+#[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct Constant<T>(pub T);
 

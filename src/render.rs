@@ -5,6 +5,7 @@ use winit::dpi::PhysicalSize;
 pub struct Render
 {
     texture_size: PhysicalSize<u32>,
+    use_double_precision: bool,
     render_pipeline: wgpu::RenderPipeline,
     instance_bind_group_layout: wgpu::BindGroupLayout,
     uniform: Uniform,
@@ -20,6 +21,7 @@ struct Uniform
 
 pub struct Instance
 {
+    use_double_precision: bool,
     buffer: wgpu::Buffer,
     fractal_texture: wgpu::Texture,
     bind_group: wgpu::BindGroup,
@@ -27,7 +29,7 @@ pub struct Instance
 
 impl Uniform
 {
-    fn new(target: &crate::Target) -> Self
+    fn new(target: &crate::Target, use_double_precision: bool) -> Self
     {
         let bind_group_layout = target.device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor
@@ -57,12 +59,21 @@ impl Uniform
                     },
                 ],
             });
+
+        let uniform_data_size = if use_double_precision
+        {
+            std::mem::size_of::<shared::render::Uniforms64>()
+        }
+        else
+        {
+            std::mem::size_of::<shared::render::Uniforms32>()
+        };
         
         let buffer = target.device.create_buffer(
             &wgpu::BufferDescriptor
             {
                 label: Some("uniforms"),
-                size: std::mem::size_of::<shared::render::Uniforms>() as u64,
+                size: uniform_data_size as u64,
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
@@ -108,11 +119,20 @@ impl Instance
 {
     fn new(target: &crate::Target, render: &Render) -> Self
     {
+        let instance_data_size = if render.use_double_precision
+        {
+            std::mem::size_of::<shared::render::Instance64>()
+        }
+        else
+        {
+            std::mem::size_of::<shared::render::Instance32>()
+        };
+
         let buffer = target.device.create_buffer(
             &wgpu::BufferDescriptor
             {
                 label: Some("instance"),
-                size: std::mem::size_of::<shared::render::Instance>() as u64,
+                size: instance_data_size as u64,
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
@@ -159,6 +179,7 @@ impl Instance
 
         Self
         {
+            use_double_precision: render.use_double_precision,
             buffer,
             fractal_texture,
             bind_group,
@@ -170,17 +191,25 @@ impl Instance
         &self.fractal_texture
     }
 
-    pub fn set_data(&self, queue: &wgpu::Queue, instance: &shared::render::Instance)
+    pub fn set_data(&self, queue: &wgpu::Queue, instance: &shared::render::Instance64)
     {
-        queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(instance));
+        if self.use_double_precision
+        {
+            queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(instance));
+        }
+        else
+        {
+            let instance: shared::render::Instance32 = (*instance).into();
+            queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&instance));
+        }
     }
 }
 
 impl Render
 {
-    pub fn new(target: &crate::Target, shader_module: &wgpu::ShaderModule, texture_size: PhysicalSize<u32>) -> Self
+    pub fn new(target: &crate::Target, vertex_shader_module: &wgpu::ShaderModule, fragment_shader_module: &wgpu::ShaderModule, texture_size: PhysicalSize<u32>, use_double_precision: bool) -> Self
     {
-		let uniform = Uniform::new(target);
+		let uniform = Uniform::new(target, use_double_precision);
         
         let instance_bind_group_layout = target.device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor
@@ -229,13 +258,13 @@ impl Render
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState
                 {
-                    module: shader_module,
+                    module: vertex_shader_module,
                     entry_point: "vertex",
                     buffers: &[],
                 },
                 fragment: Some(wgpu::FragmentState
                 {
-                    module: shader_module,
+                    module: fragment_shader_module,
                     entry_point: "fragment",
                     targets: &[Some(target.config.format.into())],
                 }),
@@ -248,6 +277,7 @@ impl Render
         Self
         {
             texture_size,
+            use_double_precision,
             render_pipeline,
             instance_bind_group_layout,
             uniform,
@@ -292,9 +322,17 @@ impl Render
     pub fn set_uniforms(
         &self,
         queue: &wgpu::Queue,
-        uniform: &shared::render::Uniforms
+        uniform: &shared::render::Uniforms64
     )
     {
-        queue.write_buffer(&self.uniform.buffer, 0, bytemuck::bytes_of(uniform));
+        if self.use_double_precision
+        {
+            queue.write_buffer(&self.uniform.buffer, 0, bytemuck::bytes_of(uniform));
+        }
+        else
+        {
+            let uniform: shared::render::Uniforms32 = (*uniform).into();
+            queue.write_buffer(&self.uniform.buffer, 0, bytemuck::bytes_of(&uniform));
+        }
     }
 }

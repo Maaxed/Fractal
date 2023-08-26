@@ -1,0 +1,11 @@
+[package]
+name = "fractal_renderer_shader_fragment"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "lib.rs"
+crate-type = ["dylib"]
+
+[dependencies]
+spirv-std.workspace = true

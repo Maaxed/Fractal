@@ -1,0 +1,12 @@
+[package]
+name = "fractal_renderer_shader_vertex32"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "lib.rs"
+crate-type = ["dylib"]
+
+[dependencies]
+spirv-std.workspace = true
+fractal_renderer_shared.workspace = true

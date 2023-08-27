@@ -6,7 +6,7 @@ pub use function::{Func, Function, Differentiable};
 pub use complex::*;
 
 use glam::{Vec2 as FVec2, DVec2};
-use num_traits::{Float, Pow, Inv, AsPrimitive, NumAssign};
+use num_traits::{Float, Pow, Inv, AsPrimitive, NumAssign, Euclid};
 use core::ops::*;
 
 pub trait Exp
@@ -70,6 +70,11 @@ impl<T: Float + Pow<T, Output = T>> Exp for T
     {
         Float::log(self, base)
     }
+}
+
+pub fn rem_euclid(v: f32, d: f32) -> f32
+{
+    Euclid::rem_euclid(&v, &d)
 }
 
 pub fn exp(v: f32) -> f32

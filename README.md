@@ -24,3 +24,4 @@ cargo run --release
 - C: Mandelbrot method with z<sub>n+1</sub> = cos(z<sub>n</sub>) + 1 / c
 - L: Lyapunov fractal
 - J: Switch between normal mode and julia set mode
+- O: Switch between normal rendering, point based orbit trap and cross based orbit trap

@@ -40,6 +40,16 @@ pub enum FractalVariation
     JuliaSet,
 }
 
+#[repr(u32)]
+#[cfg_attr(feature = "bytemuck", derive(NoUninit))]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum RenderTechnique
+{
+    Normal,
+    OrbitTrapPoint,
+    OrbitTrapCross,
+}
+
 #[repr(C)]
 #[cfg_attr(feature = "bytemuck", derive(NoUninit))]
 #[derive(Copy, Clone)]
@@ -48,6 +58,7 @@ pub struct FractalParams32
     pub secondary_pos: Complex32,
     pub fractal_kind: FractalKind,
     pub variation: FractalVariation,
+    pub render_technique: RenderTechnique,
 }
 
 impl Default for FractalParams32
@@ -59,6 +70,7 @@ impl Default for FractalParams32
             secondary_pos: Complex32::ZERO,
             fractal_kind: FractalKind::MandelbrotSet,
             variation: FractalVariation::Normal,
+            render_technique: RenderTechnique::Normal,
         }
     }
 }
@@ -71,8 +83,8 @@ pub struct FractalParams64
     pub secondary_pos: Complex64,
     pub fractal_kind: FractalKind,
     pub variation: FractalVariation,
+    pub render_technique: RenderTechnique,
     padding0: u32,
-    padding1: u32,
 }
 
 impl Default for FractalParams64
@@ -84,8 +96,8 @@ impl Default for FractalParams64
             secondary_pos: Complex64::ZERO,
             fractal_kind: FractalKind::MandelbrotSet,
             variation: FractalVariation::Normal,
+            render_technique: RenderTechnique::Normal,
             padding0: Default::default(),
-            padding1: Default::default(),
         }
     }
 }
@@ -99,6 +111,7 @@ impl From<FractalParams64> for FractalParams32
             secondary_pos: value.secondary_pos.to_complex32(),
             fractal_kind: value.fractal_kind,
             variation: value.variation,
+            render_technique: value.render_technique,
         }
     }
 }
@@ -110,6 +123,7 @@ pub struct FractalParams<S: Scalar>
     pub secondary_pos: Complex<S>,
     pub fractal_kind: FractalKind,
     pub variation: FractalVariation,
+    pub render_technique: RenderTechnique,
 }
 
 impl From<FractalParams32> for FractalParams<f32>
@@ -121,6 +135,7 @@ impl From<FractalParams32> for FractalParams<f32>
             secondary_pos: value.secondary_pos,
             fractal_kind: value.fractal_kind,
             variation: value.variation,
+            render_technique: value.render_technique,
         }
     }
 }
@@ -134,6 +149,7 @@ impl From<FractalParams64> for FractalParams<f64>
             secondary_pos: value.secondary_pos,
             fractal_kind: value.fractal_kind,
             variation: value.variation,
+            render_technique: value.render_technique,
         }
     }
 }
@@ -193,11 +209,11 @@ pub fn compute_fractal_color<S: Scalar>(pos: Complex<S>, params: FractalParams<S
         EscapeResult::StayedInside => vec3(0.0, 0.0, 0.0),
         EscapeResult::Escaped(v) =>
         {
-            let v = ln(v + 1.0);
+            let v = ln(v);
 
             //Gradient: orange - purple - blue - cyan - white - yellow
             let palette = [vec3(1.0, 0.5, 0.0), vec3(0.5, 0.0, 1.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 1.0), vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, 0.0), vec3(1.0, 0.5, 0.0)];
-            let v = v % (palette.len() - 1) as f32;
+            let v = rem_euclid(v, (palette.len() - 1) as f32);
 
             let i = floor(v) as usize;
             let t = v % 1.0;

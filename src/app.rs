@@ -2,13 +2,14 @@ use std::collections::BTreeMap;
 
 use fractal_renderer_shared as shared;
 use shared::math::*;
-use shared::fractal::{FractalKind, FractalVariation};
+use shared::fractal::{FractalKind, FractalVariation, RenderTechnique};
 use glam::{dvec2, DVec2, i64vec2};
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseScrollDelta, MouseButton};
 
 use crate::quad_cell::QuadPos;
+use crate::render::Render;
 
 const VERTEX32_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_vertex32.spv"));
 const VERTEX64_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_vertex64.spv"));
@@ -136,6 +137,20 @@ impl App
 		self.cells.clear();
 
 		self.fractal_params.variation = fractal_variation;
+		
+		self.target.window.request_redraw();
+	}
+
+	fn set_fractal_rendering(&mut self, rendering_technique: RenderTechnique)
+	{
+		if self.fractal_params.render_technique == rendering_technique
+		{
+			return;
+		}
+
+		self.cells.clear();
+
+		self.fractal_params.render_technique = rendering_technique;
 		
 		self.target.window.request_redraw();
 	}
@@ -339,6 +354,15 @@ impl App
 									});
 									(self.pos, self.fractal_params.secondary_pos) = (self.fractal_params.secondary_pos.to_vector(), Complex64::from_vector(self.pos));
 									(self.zoom, self.secondary_zoom) = (self.secondary_zoom, self.zoom);
+								},
+								VirtualKeyCode::O =>
+								{
+									self.set_fractal_rendering(match self.fractal_params.render_technique
+									{
+										RenderTechnique::Normal => RenderTechnique::OrbitTrapPoint,
+										RenderTechnique::OrbitTrapPoint => RenderTechnique::OrbitTrapCross,
+										RenderTechnique::OrbitTrapCross => RenderTechnique::Normal,
+									});
 								},
 								VirtualKeyCode::R =>
 								{

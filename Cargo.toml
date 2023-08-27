@@ -20,7 +20,7 @@ edition = "2021"
 [workspace.dependencies]
 glam = { version = "0.24", default-features = false }
 bytemuck = { version = "1.13", features = ["derive"] }
-spirv-std = "0.8"
+spirv-std = "0.9"
 fractal_renderer_shared = { path = "./shared" }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -33,11 +33,11 @@ codegen-units = 16
 opt-level = 3
 
 [build-dependencies]
-spirv-builder = "0.8"
+spirv-builder = "0.9"
 
 [dependencies]
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
-wgpu = { version = "0.16", features = ["spirv", "vulkan-portability"] }
+wgpu = { version = "0.17", features = ["spirv", "vulkan-portability"] }
 winit = "0.28.6"
 glam = { workspace = true, default-features = true, features = ["bytemuck"] }
 bytemuck = { workspace = true }

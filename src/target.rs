@@ -1,4 +1,3 @@
-use futures::TryFutureExt;
 use winit::{window::Window, event_loop::EventLoopWindowTarget, dpi::PhysicalSize};
 
 
@@ -24,7 +23,7 @@ impl Target
 		
 		let surface = unsafe { instance.create_surface(&window) }.expect("Failed to create surface");
 
-		let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, backends, Some(&surface))
+		let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
 			.await
 			.expect("Failed to find an appropriate adapter");
 
@@ -61,29 +60,19 @@ impl Target
 
 	async fn request_device(adapter: &wgpu::Adapter) -> Result<(wgpu::Device, wgpu::Queue), wgpu::RequestDeviceError>
 	{
+		let optional_features = wgpu::Features::SHADER_F64;
+		let available_features = adapter.features();
+
 		adapter
 			.request_device(
 				&wgpu::DeviceDescriptor
 				{
 					label: None,
-					features: wgpu::Features::SHADER_F64,
+					features: optional_features & available_features,
 					limits: wgpu::Limits::default(),
 				},
 				None,
-			)
-			.or_else(|_|
-			{
-				adapter
-					.request_device(
-						&wgpu::DeviceDescriptor
-						{
-							label: None,
-							features: wgpu::Features::empty(),
-							limits: wgpu::Limits::default(),
-						},
-						None,
-					)
-			}).await
+			).await
 	}
 
 	pub fn configure_surface(&self)

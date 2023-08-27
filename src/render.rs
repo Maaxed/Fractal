@@ -15,7 +15,6 @@ struct Uniform
 {
     bind_group_layout: wgpu::BindGroupLayout,
     buffer: wgpu::Buffer,
-    fractal_sampler: wgpu::Sampler,
     bind_group: wgpu::BindGroup,
 }
 
@@ -109,7 +108,6 @@ impl Uniform
         {
             bind_group_layout,
             buffer,
-            fractal_sampler,
             bind_group
         }
     }

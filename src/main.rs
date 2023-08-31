@@ -5,7 +5,6 @@ mod app;
 mod quad_cell;
 
 pub use target::Target;
-pub use app::App;
 
 fn main()
 {
@@ -19,7 +18,7 @@ async fn run()
     
     let target = Target::new(&event_loop).await;
 
-    let app = App::new(target);
+    let app = app::make_app(target);
 
     app.run(event_loop);
 }

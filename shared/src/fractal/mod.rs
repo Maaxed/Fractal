@@ -154,6 +154,9 @@ impl From<FractalParams64> for FractalParams<f64>
     }
 }
 
+const PALETTE: [Vec3; 7] = [vec3(1.0, 0.5, 0.0), vec3(0.5, 0.0, 1.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 1.0), vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, 0.0), vec3(1.0, 0.5, 0.0)];
+const PALETTE_SIZE: usize = PALETTE.len();
+
 pub fn compute_fractal_color<S: Scalar>(pos: Complex<S>, params: FractalParams<S>) -> Vec3
 {
     let res = match params.fractal_kind
@@ -212,13 +215,12 @@ pub fn compute_fractal_color<S: Scalar>(pos: Complex<S>, params: FractalParams<S
             let v = ln(v);
 
             //Gradient: orange - purple - blue - cyan - white - yellow
-            let palette = [vec3(1.0, 0.5, 0.0), vec3(0.5, 0.0, 1.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 1.0), vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, 0.0), vec3(1.0, 0.5, 0.0)];
-            let v = rem_euclid(v, (palette.len() - 1) as f32);
+            let v = rem_euclid(v, (PALETTE_SIZE - 1) as f32);
 
             let i = floor(v) as usize;
             let t = v % 1.0;
-            let c1 = palette[i];
-            let c2 = palette[i+1];
+            let c1 = PALETTE[i];
+            let c2 = PALETTE[i+1];
             c1 + (c2 - c1) * t
         },
     }

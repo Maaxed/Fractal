@@ -1,10 +1,14 @@
 use fractal_renderer_shared as shared;
+use crate::app::AppData;
+use crate::render::Render;
+use crate::Target;
+use crate::quad_cell::QuadPos;
 use wgpu::{ComputePipeline, Buffer, BindGroup, CommandEncoder};
 use winit::dpi::PhysicalSize;
+use glam::dvec2;
 
-use crate::Target;
 
-pub struct Compute
+pub struct ShaderCompute
 {
     fixed: Fixed,
     dynamic: Dynamic,
@@ -157,7 +161,7 @@ impl Dynamic
     }
 }
 
-impl Compute
+impl ShaderCompute
 {
     pub fn new(target: &Target, shader_module: &wgpu::ShaderModule, workgroup_size: glam::UVec2, texture_size: PhysicalSize<u32>, use_double_precision: bool) -> Self
     {
@@ -227,5 +231,42 @@ impl Compute
             },
             destination.size()
         );
+    }
+
+    fn compute_cell(&self, target: &Target, render: &Render, app: &mut AppData, commands: &mut wgpu::CommandEncoder, pos: QuadPos)
+    {
+		let cell_size = pos.cell_size();
+		let cell_pos = pos.cell_bottom_left();
+        
+		self.set_params(&target.queue, &shared::compute::Params64
+		{
+			min_pos: cell_pos + dvec2(0.0, cell_size),
+			max_pos: cell_pos + dvec2(cell_size, 0.0),
+			fractal: app.fractal_params,
+		});
+
+        let cell = app.make_cell(target, render, pos);
+
+		self.make_compute_pass(commands);
+		self.copy_buffer_to_texture(commands, cell.fractal_texture());
+    }
+}
+
+impl super::Compute for ShaderCompute
+{
+    fn reset(&mut self)
+    { }
+
+    fn update_before_render(&mut self, target: &Target, render: &Render, app: &mut AppData, commands: &mut wgpu::CommandEncoder)
+    {
+        // Find new cell to load
+		for pos in app.visible_cells()
+		{
+            if !app.is_cell_loaded(pos)
+            {
+                self.compute_cell(target, render, app, commands, pos);
+                return;
+            }
+		}
     }
 }

@@ -18,7 +18,7 @@ pub fn lyapunov<S: Scalar, const L: usize>(sequence: &[bool; L], pos: Vec2<S>) -
 
     for i in 0..ITERATION_COUNT
     {
-        let rn = if sequence[i % sequence.len()] { pos.y() } else { pos.x() };
+        let rn = if sequence[i % L] { pos.y() } else { pos.x() };
 
         if i != 0
         {

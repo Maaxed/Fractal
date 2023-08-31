@@ -8,7 +8,9 @@ use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event_loop::{EventLoop, ControlFlow};
 use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseScrollDelta, MouseButton};
 
+use crate::{Target, render};
 use crate::quad_cell::QuadPos;
+use crate::compute::Compute;
 use crate::render::Render;
 
 const VERTEX32_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_vertex32.spv"));
@@ -17,259 +19,155 @@ const FRAGMENT_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader
 const COMPUTE32_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_compute32.spv"));
 const COMPUTE64_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_compute64.spv"));
 
-pub struct App
+pub struct App<C>
 {
-	target: crate::Target,
-	render: crate::render::Render,
-	compute: crate::compute::Compute,
-	cell_size: u32,
-	cells: BTreeMap<QuadPos, crate::render::Instance>,
-    pos: DVec2,
-    zoom: f64,
-	secondary_zoom: f64,
-	fractal_params: shared::fractal::FractalParams64,
-	prev_mouse_pos: Option<PhysicalPosition<f64>>,
+	target: Target,
+	render: Render,
+	compute: C,
+	app_data: AppData,
 	mouse_left_down: bool,
 	mouse_right_down: bool,
-	require_redraw: bool,
 }
 
-impl App
+pub fn make_app(target: Target) -> App<impl Compute>
 {
-	pub fn new(target: crate::Target) -> Self
+	let use_double_precision = target.device.features().contains(wgpu::Features::SHADER_F64);
+
+	let (vertex_shader_code, fragment_shader_code, compute_shader_code) =
+		if use_double_precision
+		{
+			(VERTEX64_SHADER_CODE, FRAGMENT_SHADER_CODE, COMPUTE64_SHADER_CODE)
+		}
+		else
+		{
+			(VERTEX32_SHADER_CODE, FRAGMENT_SHADER_CODE, COMPUTE32_SHADER_CODE)
+		};
+	
+	let vertex_shader_module = target.device.create_shader_module(
+		wgpu::ShaderModuleDescriptor
+		{
+			label: Some("vertex_shader"),
+			source: wgpu::util::make_spirv(vertex_shader_code),
+		});
+	
+	let fragment_shader_module = target.device.create_shader_module(
+		wgpu::ShaderModuleDescriptor
+		{
+			label: Some("fragment_shader"),
+			source: wgpu::util::make_spirv(fragment_shader_code),
+		});
+	
+	let compute_shader_module = target.device.create_shader_module(
+		wgpu::ShaderModuleDescriptor
+		{
+			label: Some("compute_shader"),
+			source: wgpu::util::make_spirv(compute_shader_code),
+		});
+	
+	let cell_size = PhysicalSize::new(256, 256);
+	
+	let render = Render::new(&target, &vertex_shader_module, &fragment_shader_module, cell_size, use_double_precision);
+
+	let workgroup_size = glam::uvec2(16, 16);
+	let compute = crate::compute::ShaderCompute::new(&target, &compute_shader_module, workgroup_size, cell_size, use_double_precision);
+
+	App::new(target, compute, render, cell_size)
+}
+
+impl<C: Compute> App<C>
+{
+	pub fn new(target: Target, compute: C, render: Render, cell_size: PhysicalSize<u32>) -> Self
 	{
-		let use_double_precision = target.device.features().contains(wgpu::Features::SHADER_F64);
-
-		let (vertex_shader_code, fragment_shader_code, compute_shader_code) =
-			if use_double_precision
-			{
-				(VERTEX64_SHADER_CODE, FRAGMENT_SHADER_CODE, COMPUTE64_SHADER_CODE)
-			}
-			else
-			{
-				(VERTEX32_SHADER_CODE, FRAGMENT_SHADER_CODE, COMPUTE32_SHADER_CODE)
-			};
-		
-        let vertex_shader_module = target.device.create_shader_module(
-            wgpu::ShaderModuleDescriptor
-            {
-                label: Some("vertex_shader"),
-                source: wgpu::util::make_spirv(vertex_shader_code),
-            });
-		
-        let fragment_shader_module = target.device.create_shader_module(
-            wgpu::ShaderModuleDescriptor
-            {
-                label: Some("fragment_shader"),
-                source: wgpu::util::make_spirv(fragment_shader_code),
-            });
-		
-        let compute_shader_module = target.device.create_shader_module(
-            wgpu::ShaderModuleDescriptor
-            {
-                label: Some("compute_shader"),
-                source: wgpu::util::make_spirv(compute_shader_code),
-            });
-		
-		let workgroup_size = glam::uvec2(16, 16);
-		let cell_size = PhysicalSize::new(256, 256);
-    	let compute = crate::compute::Compute::new(&target, &compute_shader_module, workgroup_size, cell_size, use_double_precision);
-		
-		let render = crate::render::Render::new(&target, &vertex_shader_module, &fragment_shader_module, cell_size, use_double_precision);
-
+		let screen_size = target.window.inner_size();
 		Self
 		{
 			target,
 			render,
 			compute,
-			cell_size: cell_size.width.min(cell_size.height),
-			cells: BTreeMap::new(),
-			pos: DVec2::ZERO,
-			zoom: 1.0,
-			secondary_zoom: 1.0,
-			fractal_params: Default::default(),
-			prev_mouse_pos: None,
+			app_data: AppData::new(cell_size, screen_size),
 			mouse_left_down: false,
 			mouse_right_down: false,
-			require_redraw: false,
 		}
 	}
 
     fn resize(&mut self, new_size: PhysicalSize<u32>)
 	{
 		self.target.resize(new_size);
+		self.app_data.resize(new_size);
     }
 
-	fn apply_zoom(&mut self, zoom_value: f64)
+	fn reset_fractal_rendering(&mut self)
 	{
-		let old_zoom = self.zoom;
-		self.zoom *= (-zoom_value * 0.5).exp();
-
-		if let Some(mouse_pos) = self.prev_mouse_pos
-		{
-			self.pos += dvec2(mouse_pos.x - self.target.config.width as f64 * 0.5, self.target.config.height as f64 * 0.5 - mouse_pos.y) * self.base_pixel_world_size() * (old_zoom - self.zoom);
-		}
-		
-		self.target.window.request_redraw();
+		self.app_data.cells.clear();
+		self.compute.reset();
 	}
 
 	fn set_fractal_kind(&mut self, fractal_kind: FractalKind)
 	{
-		if self.fractal_params.fractal_kind == fractal_kind
+		if self.app_data.fractal_params.fractal_kind == fractal_kind
 		{
 			return;
 		}
 
-		self.cells.clear();
+		self.reset_fractal_rendering();
 
-		self.fractal_params.fractal_kind = fractal_kind;
+		self.app_data.fractal_params.fractal_kind = fractal_kind;
 		
-		self.target.window.request_redraw();
+		self.app_data.require_redraw = true;
 	}
 
 	fn set_fractal_variation(&mut self, fractal_variation: FractalVariation)
 	{
-		if self.fractal_params.variation == fractal_variation
+		if self.app_data.fractal_params.variation == fractal_variation
 		{
 			return;
 		}
 
-		self.cells.clear();
+		self.reset_fractal_rendering();
 
-		self.fractal_params.variation = fractal_variation;
+		self.app_data.fractal_params.variation = fractal_variation;
 		
-		self.target.window.request_redraw();
+		self.app_data.require_redraw = true;
 	}
 
 	fn set_fractal_rendering(&mut self, rendering_technique: RenderTechnique)
 	{
-		if self.fractal_params.render_technique == rendering_technique
+		if self.app_data.fractal_params.render_technique == rendering_technique
 		{
 			return;
 		}
 
-		self.cells.clear();
+		self.reset_fractal_rendering();
 
-		self.fractal_params.render_technique = rendering_technique;
+		self.app_data.fractal_params.render_technique = rendering_technique;
 		
-		self.target.window.request_redraw();
-	}
-
-	fn base_pixel_world_size(&self) -> f64
-	{
-		4.0 / self.target.config.width.min(self.target.config.height) as f64
-	}
-
-	fn pixel_world_size(&self) -> f64
-	{
-		self.base_pixel_world_size() * self.zoom
-	}
-
-	fn viewport_world_size(&self) -> DVec2
-	{
-		let window_size = dvec2(self.target.config.width as f64, self.target.config.height as f64);
-		window_size * self.pixel_world_size()
-	}
-
-	fn compute_cell(&self, commands: &mut wgpu::CommandEncoder, pos: QuadPos) -> crate::render::Instance
-	{
-		let cell_size = pos.cell_size();
-		let cell_pos = pos.cell_bottom_left();
-
-		let cell = self.render.make_instance(&self.target);
-
-		cell.set_data(&self.target.queue, &shared::render::Instance64
-		{
-			pos: cell_pos,
-			size: DVec2::splat(cell_size),
-		});
-
-		// Compute
-		self.compute.set_params(&self.target.queue, &shared::compute::Params64
-		{
-			min_pos: cell_pos + dvec2(0.0, cell_size),
-			max_pos: cell_pos + dvec2(cell_size, 0.0),
-			fractal: self.fractal_params,
-		});
-		self.compute.make_compute_pass(commands);
-		self.compute.copy_buffer_to_texture(commands, cell.fractal_texture());
-
-		cell
-	}
-
-	fn cleanup_cells(&mut self, viewport_size: DVec2, exponent_range: (i32, i32))
-	{
-		let valid_exponents = (exponent_range.0 - 4) ..= (exponent_range.1 + 4);
-		let valid_pos_min = self.pos - viewport_size * 2.0;
-		let valid_pos_max = self.pos + viewport_size * 2.0;
-
-		self.cells.retain(|pos, _cell| valid_exponents.contains(&pos.exponent) && pos.cell_bottom_left().cmplt(valid_pos_max).all() && pos.cell_top_right().cmpgt(valid_pos_min).all());
-	}
-
-	fn find_cell_to_load(&mut self, viewport_size: DVec2, exponent_range: (i32, i32)) -> Option<QuadPos>
-	{
-		let viewport_min = self.pos - viewport_size / 2.0;
-		let viewport_max = self.pos + viewport_size / 2.0;
-
-		for exponent in (exponent_range.0 ..= exponent_range.1).rev()
-		{
-			let cell_size = 2.0_f64.powi(exponent);
-
-			let quad_min = (viewport_min / cell_size).floor().as_i64vec2();
-			let quad_max = (viewport_max / cell_size).ceil().as_i64vec2();
-
-			let cells_iter = (quad_min.x .. quad_max.x).flat_map(|x| (quad_min.y .. quad_max.y).map(move |y| i64vec2(x, y)));
-			let mut cells: Vec<_> = cells_iter.map(|pos| (pos, (self.pos - (pos.as_dvec2() + 0.5) * cell_size).length_squared())).collect();
-			cells.sort_by(|(_pos1, dist1), (_pos2, dist2)| dist1.partial_cmp(dist2).unwrap());
-
-			for (pos, _dist) in cells
-			{
-				let cell = QuadPos { unscaled_pos: pos, exponent };
-				if !self.cells.contains_key(&cell)
-				{
-					return Some(cell);
-				}
-			}
-		}
-		None
+		self.app_data.require_redraw = true;
 	}
 
 	fn do_render(&mut self, commands: &mut wgpu::CommandEncoder, output: &wgpu::SurfaceTexture)
 	{
 		let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-		let scale = 2.0 / self.viewport_world_size();
+		let scale = 2.0 / self.app_data.viewport_world_size();
 		self.render.set_uniforms(&self.target.queue, &shared::render::Uniforms64
 			{
-				camera_pos: self.pos,
+				camera_pos: self.app_data.pos,
 				world_to_view_scale: scale,
 			});
 
-		self.render.make_render_pass(self.cells.iter().map(|(_pos, instance)| instance), &view, commands);
+		self.render.make_render_pass(self.app_data.cells.values(), &view, commands);
 	}
 
 	pub fn redraw(&mut self) -> Result<(), wgpu::SurfaceError>
 	{
-		self.require_redraw = false;
-
-		let viewport_size = self.viewport_world_size();
-		let min_exponent = (self.pixel_world_size() * self.cell_size as f64).log2().floor() as i32;
-		let max_exponent = (self.zoom.log2().ceil() as i32 + 1).max(min_exponent);
-		let exponent_range = (min_exponent, max_exponent);
+		self.app_data.require_redraw = false;
 
 		// Free cells that are far away
-		self.cleanup_cells(viewport_size, exponent_range);
+		self.app_data.cleanup_cells();
 
-		// Find new cell to load
-		let quad_pos = self.find_cell_to_load(viewport_size, exponent_range);
-		
 		let mut commands = self.target.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-		if let Some(pos) = quad_pos
-		{
-			self.cells.insert(pos, self.compute_cell(&mut commands, pos));
-			self.require_redraw = true;
-		}
+		self.compute.update_before_render(&self.target, &self.render, &mut self.app_data, &mut commands);
 		
 		let output = self.target.surface.get_current_texture()?;
 
@@ -303,9 +201,9 @@ impl App
 				},
 				Event::MainEventsCleared =>
 				{
-					if self.require_redraw
+					if self.app_data.require_redraw
 					{
-						self.require_redraw = false;
+						self.app_data.require_redraw = false;
 						self.target.window.request_redraw();
 					}
 				}
@@ -347,17 +245,17 @@ impl App
 								VirtualKeyCode::L => self.set_fractal_kind(FractalKind::Lyapunov),
 								VirtualKeyCode::J =>
 								{
-									self.set_fractal_variation(match self.fractal_params.variation
+									self.set_fractal_variation(match self.app_data.fractal_params.variation
 									{
 										FractalVariation::Normal => FractalVariation::JuliaSet,
 										FractalVariation::JuliaSet => FractalVariation::Normal,
 									});
-									(self.pos, self.fractal_params.secondary_pos) = (self.fractal_params.secondary_pos.to_vector(), Complex64::from_vector(self.pos));
-									(self.zoom, self.secondary_zoom) = (self.secondary_zoom, self.zoom);
+									(self.app_data.pos, self.app_data.fractal_params.secondary_pos) = (self.app_data.fractal_params.secondary_pos.to_vector(), Complex64::from_vector(self.app_data.pos));
+									(self.app_data.zoom, self.app_data.secondary_zoom) = (self.app_data.secondary_zoom, self.app_data.zoom);
 								},
 								VirtualKeyCode::O =>
 								{
-									self.set_fractal_rendering(match self.fractal_params.render_technique
+									self.set_fractal_rendering(match self.app_data.fractal_params.render_technique
 									{
 										RenderTechnique::Normal => RenderTechnique::OrbitTrapPoint,
 										RenderTechnique::OrbitTrapPoint => RenderTechnique::OrbitTrapCross,
@@ -366,10 +264,7 @@ impl App
 								},
 								VirtualKeyCode::R =>
 								{
-									self.cells = BTreeMap::new();
-									self.pos = DVec2::ZERO;
-									self.zoom = 1.0;
-									self.fractal_params.secondary_pos = Complex64::ZERO;
+									self.app_data.reset();
 									self.target.window.request_redraw();
 								},
 								_ => {},
@@ -381,11 +276,11 @@ impl App
 							{
 								MouseScrollDelta::LineDelta(_dx, dy) =>
 								{
-									self.apply_zoom(*dy as f64);
+									self.app_data.apply_zoom(*dy as f64);
 								},
 								MouseScrollDelta::PixelDelta(delta) =>
 								{
-									self.apply_zoom(delta.y * 10.0);
+									self.app_data.apply_zoom(delta.y * 10.0);
 								},
 							}
 						},
@@ -400,26 +295,171 @@ impl App
 						},
 						WindowEvent::CursorMoved { position, .. } =>
 						{
-							if let Some(prev_pos) = self.prev_mouse_pos
+							if let Some(prev_pos) = self.app_data.prev_mouse_pos
 							{
 								if self.mouse_left_down
 								{
-									self.pos -= dvec2(position.x - prev_pos.x, prev_pos.y - position.y) * self.pixel_world_size();
+									self.app_data.pos -= dvec2(position.x - prev_pos.x, prev_pos.y - position.y) * self.app_data.pixel_world_size();
 									self.target.window.request_redraw();
 								}
 								else if self.mouse_right_down
 								{
-									self.cells.clear();
-									self.fractal_params.secondary_pos -= Complex64::new(position.x - prev_pos.x, position.y - prev_pos.y) * self.pixel_world_size();
+									self.reset_fractal_rendering();
+									self.app_data.fractal_params.secondary_pos -= Complex64::new(position.x - prev_pos.x, position.y - prev_pos.y) * self.app_data.pixel_world_size();
 									self.target.window.request_redraw();
 								}
 							}
-							self.prev_mouse_pos = Some(*position);
+							self.app_data.prev_mouse_pos = Some(*position);
 						}
 						_ => {}
 					}
 				},
 				_ => {}
 			})
+	}
+}
+
+pub struct AppData
+{
+	cell_size: u32,
+	screen_size: PhysicalSize<u32>,
+	cells: BTreeMap<QuadPos, crate::render::Instance>,
+    pos: DVec2,
+    zoom: f64,
+	secondary_zoom: f64,
+	pub(crate) fractal_params: shared::fractal::FractalParams64,
+	prev_mouse_pos: Option<PhysicalPosition<f64>>,
+	require_redraw: bool,
+}
+
+impl AppData
+{
+	pub fn new(cell_size: PhysicalSize<u32>, screen_size: PhysicalSize<u32>) -> Self
+	{
+		Self
+		{
+			cell_size: cell_size.width.min(cell_size.height),
+			screen_size,
+			cells: BTreeMap::new(),
+			pos: DVec2::ZERO,
+			zoom: 1.0,
+			secondary_zoom: 1.0,
+			fractal_params: Default::default(),
+			prev_mouse_pos: None,
+			require_redraw: false,
+		}
+	}
+
+	fn resize(&mut self, new_screen_size: PhysicalSize<u32>)
+	{
+		self.screen_size = new_screen_size;
+	}
+
+	fn reset(&mut self)
+	{
+		self.cells = BTreeMap::new();
+		self.pos = DVec2::ZERO;
+		self.zoom = 1.0;
+		self.fractal_params.secondary_pos = Complex64::ZERO;
+	}
+
+	fn apply_zoom(&mut self, zoom_value: f64)
+	{
+		let old_zoom = self.zoom;
+		self.zoom *= (-zoom_value * 0.5).exp();
+
+		if let Some(mouse_pos) = self.prev_mouse_pos
+		{
+			self.pos += dvec2(mouse_pos.x - self.screen_size.width as f64 * 0.5, self.screen_size.height as f64 * 0.5 - mouse_pos.y) * self.base_pixel_world_size() * (old_zoom - self.zoom);
+		}
+		
+		self.require_redraw = true;
+	}
+
+	fn base_pixel_world_size(&self) -> f64
+	{
+		4.0 / self.screen_size.width.min(self.screen_size.height) as f64
+	}
+
+	fn pixel_world_size(&self) -> f64
+	{
+		self.base_pixel_world_size() * self.zoom
+	}
+
+	fn viewport_world_size(&self) -> DVec2
+	{
+		let window_size = dvec2(self.screen_size.width as f64, self.screen_size.height as f64);
+		window_size * self.pixel_world_size()
+	}
+
+	fn exponent_range(&self) -> (i32, i32)
+	{
+		let min_exponent = (self.pixel_world_size() * self.cell_size as f64).log2().floor() as i32;
+		let max_exponent = (self.zoom.log2().ceil() as i32 + 1).max(min_exponent);
+		(min_exponent, max_exponent)
+	}
+
+	fn cleanup_cells(&mut self)
+	{
+		let viewport_size = self.viewport_world_size();
+		let exponent_range = self.exponent_range();
+
+		let valid_exponents = (exponent_range.0 - 4) ..= (exponent_range.1 + 4);
+		let valid_pos_min = self.pos - viewport_size * 2.0;
+		let valid_pos_max = self.pos + viewport_size * 2.0;
+
+		self.cells.retain(|pos, _cell| valid_exponents.contains(&pos.exponent) && pos.cell_bottom_left().cmplt(valid_pos_max).all() && pos.cell_top_right().cmpgt(valid_pos_min).all());
+	}
+
+	pub fn visible_cells(&self) -> impl Iterator<Item = QuadPos>
+	{
+		let viewport_size = self.viewport_world_size();
+		let exponent_range = self.exponent_range();
+
+		let cal_pos = self.pos;
+		let viewport_min = cal_pos - viewport_size / 2.0;
+		let viewport_max = cal_pos + viewport_size / 2.0;
+
+		(exponent_range.0 ..= exponent_range.1).rev().flat_map(move |exponent|
+		{
+			let cell_size = 2.0_f64.powi(exponent);
+
+			let quad_min = (viewport_min / cell_size).floor().as_i64vec2();
+			let quad_max = (viewport_max / cell_size).ceil().as_i64vec2();
+
+			let cells_iter = (quad_min.x .. quad_max.x).flat_map(|x| (quad_min.y .. quad_max.y).map(move |y| i64vec2(x, y)));
+			let mut cells: Vec<_> = cells_iter.map(|pos| (pos, (cal_pos - (pos.as_dvec2() + 0.5) * cell_size).length_squared())).collect();
+			cells.sort_by(|(_pos1, dist1), (_pos2, dist2)| dist1.partial_cmp(dist2).unwrap());
+
+			cells.into_iter().map(move |(pos, _dist)|
+			{
+				QuadPos { unscaled_pos: pos, exponent }
+			})
+		})
+	}
+
+	pub fn is_cell_loaded(&self, pos: QuadPos) -> bool
+	{
+		self.cells.contains_key(&pos)
+	}
+
+	pub fn make_cell(&mut self, target: &Target, render: &Render, pos: QuadPos) -> &render::Instance
+	{
+		let cell_size = pos.cell_size();
+		let cell_pos = pos.cell_bottom_left();
+
+		let cell = render.make_instance(target);
+
+		cell.set_data(&target.queue, &shared::render::Instance64
+		{
+			pos: cell_pos,
+			size: DVec2::splat(cell_size),
+		});
+
+		self.cells.insert(pos, cell);
+
+		self.require_redraw = true;
+
+		&self.cells[&pos]
 	}
 }

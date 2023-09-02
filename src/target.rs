@@ -8,6 +8,7 @@ pub struct Target
 	pub config: wgpu::SurfaceConfiguration,
 	pub device: wgpu::Device,
 	pub queue: wgpu::Queue,
+	pub supports_compute_shader: bool,
 }
 
 impl Target
@@ -44,6 +45,8 @@ impl Target
             view_formats: vec![],
         };
 
+		let supports_compute_shader = adapter.get_downlevel_capabilities().flags.contains(wgpu::DownlevelFlags::COMPUTE_SHADERS);
+
 		let this = Self
 		{
 			window,
@@ -51,6 +54,7 @@ impl Target
 			config,
 			device,
 			queue,
+			supports_compute_shader,
 		};
 
         this.configure_surface();

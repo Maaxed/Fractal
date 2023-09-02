@@ -18,7 +18,5 @@ async fn run()
     
     let target = Target::new(&event_loop).await;
 
-    let app = app::make_app(target);
-
-    app.run(event_loop);
+    app::run_app(target, event_loop);
 }

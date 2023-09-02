@@ -29,7 +29,7 @@ pub struct App<C>
 	mouse_right_down: bool,
 }
 
-pub fn make_app(target: Target) -> App<impl Compute>
+pub fn run_app(target: Target, event_loop: EventLoop<()>) -> !
 {
 	let use_double_precision = target.device.features().contains(wgpu::Features::SHADER_F64);
 
@@ -63,15 +63,28 @@ pub fn make_app(target: Target) -> App<impl Compute>
 			label: Some("compute_shader"),
 			source: wgpu::util::make_spirv(compute_shader_code),
 		});
-	
-	let cell_size = PhysicalSize::new(256, 256);
-	
-	let render = Render::new(&target, &vertex_shader_module, &fragment_shader_module, cell_size, use_double_precision);
 
-	let workgroup_size = glam::uvec2(16, 16);
-	let compute = crate::compute::ShaderCompute::new(&target, &compute_shader_module, workgroup_size, cell_size, use_double_precision);
+	if target.supports_compute_shader
+	{
+		let cell_size = PhysicalSize::new(256, 256);
+		
+		let render = Render::new(&target, &vertex_shader_module, &fragment_shader_module, cell_size, use_double_precision);
 
-	App::new(target, compute, render, cell_size)
+		let workgroup_size = glam::uvec2(16, 16);
+		let compute = crate::compute::ShaderCompute::new(&target, &compute_shader_module, workgroup_size, cell_size, use_double_precision);
+
+		App::new(target, compute, render, cell_size).run(event_loop);
+	}
+	else
+	{
+		let cell_size = PhysicalSize::new(32, 32);
+		
+		let render = Render::new(&target, &vertex_shader_module, &fragment_shader_module, cell_size, use_double_precision);
+		
+		let compute = crate::compute::ThreadedCompute::new(cell_size);
+		App::new(target, compute, render, cell_size).run(event_loop)
+	};
+
 }
 
 impl<C: Compute> App<C>

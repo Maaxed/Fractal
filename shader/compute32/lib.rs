@@ -2,14 +2,8 @@
 #![deny(warnings)]
 
 use fractal_renderer_shared as shared;
-use shared::math::ComplexNumber;
 use spirv_std::spirv;
-use spirv_std::glam::{UVec3, Vec2, UVec2, uvec2};
-
-pub fn color_to_byte(color: f32) -> u32
-{
-    (color * 255.5) as u32
-}
+use spirv_std::glam::{UVec3, UVec2, uvec2, Vec3Swizzles};
 
 const WORKGROUP_SIZE: UVec2 = uvec2(16, 16);
 #[spirv(compute(threads(16, 16)))]
@@ -26,9 +20,5 @@ pub fn compute_mandelbrot(
     let size = uvec2(group_count.x * WORKGROUP_SIZE.x, group_count.y * WORKGROUP_SIZE.y);
     let index = id.x + id.y * size.x;
 
-    let c = Vec2::new(id.x as f32 + 0.5, id.y as f32 + 0.5) / size.as_vec2();
-    let pos = params.min_pos + c * (params.max_pos - params.min_pos);
-
-    let color = shared::fractal::compute_fractal_color(ComplexNumber::from_vector(pos), params.fractal.into());
-    output[index as usize] = (color_to_byte(color.x) << 16) | (color_to_byte(color.y) << 8) | color_to_byte(color.z) | 0xff000000;
+    output[index as usize] = shared::compute::run(id.xy(), size, (*params).into());
 }

@@ -1,6 +1,9 @@
 mod shader;
+mod threaded;
 
-pub use shader::ShaderCompute;
+pub use shader::*;
+pub use threaded::*;
+
 use crate::Target;
 use crate::app::AppData;
 use crate::render::Render;

@@ -153,6 +153,8 @@ pub trait Vector:
     + Div<Output = Self> + DivAssign
 {
     type Scalar: Scalar<Vector2 = Self>;
+    
+    fn new(x: Self::Scalar, y: Self::Scalar) -> Self;
 
     fn x(self) -> Self::Scalar;
 
@@ -166,6 +168,11 @@ pub trait Vector:
 impl Vector for FVec2
 {
     type Scalar = f32;
+
+    fn new(x: Self::Scalar, y: Self::Scalar) -> Self
+    {
+        FVec2::new(x, y)
+    }
 
     fn x(self) -> Self::Scalar
     {
@@ -191,6 +198,11 @@ impl Vector for FVec2
 impl Vector for DVec2
 {
     type Scalar = f64;
+
+    fn new(x: Self::Scalar, y: Self::Scalar) -> Self
+    {
+        DVec2::new(x, y)
+    }
 
     fn x(self) -> Self::Scalar
     {

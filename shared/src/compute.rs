@@ -1,5 +1,7 @@
-use glam::{Vec2 as FVec2, DVec2};
-use crate::{math::{Scalar, Vec2}, fractal::{FractalParams32, FractalParams64, FractalParams}};
+use glam::{Vec2 as FVec2, DVec2, UVec2};
+use num_traits::AsPrimitive;
+use crate::math::*;
+use crate::fractal::{FractalParams32, FractalParams64, FractalParams};
 
 #[cfg(feature = "bytemuck")]
 use bytemuck::NoUninit;
@@ -97,4 +99,19 @@ impl From<Params64> for Params<f64>
             fractal: value.fractal.into(),
         }
     }
+}
+
+pub fn color_to_byte(color: f32) -> u32
+{
+    (color * 255.5) as u32
+}
+
+pub fn run<S: Scalar>(id: UVec2, size: UVec2, params : Params<S>) -> u32
+where u32: AsPrimitive<S>
+{
+    let c = Vec2::<S>::new(id.x.as_() + 0.5_f32.into(), id.y.as_() + 0.5_f32.into()) / Vec2::<S>::new(size.x.as_(), size.y.as_());
+    let pos = params.min_pos + c * (params.max_pos - params.min_pos);
+
+    let color = crate::fractal::compute_fractal_color(ComplexNumber::from_vector(pos), params.fractal);
+    (color_to_byte(color.x) << 16) | (color_to_byte(color.y) << 8) | color_to_byte(color.z) | 0xff000000
 }

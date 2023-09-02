@@ -1,4 +1,4 @@
-use winit::{window::Window, event_loop::EventLoopWindowTarget, dpi::PhysicalSize};
+use winit::{window::Window, dpi::PhysicalSize};
 
 
 pub struct Target
@@ -13,12 +13,11 @@ pub struct Target
 
 impl Target
 {
-	pub async fn new(event_loop: &EventLoopWindowTarget<()>) -> Self
+	pub async fn new(window: Window, device_limits: wgpu::Limits) -> Self
 	{
-    	let window: Window = Window::new(event_loop).expect("Failed to create window");
 		window.set_title("Fractal");
 
-		let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::PRIMARY);
+		let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::all());
 		let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();
 		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { backends, dx12_shader_compiler });
 		
@@ -28,7 +27,7 @@ impl Target
 			.await
 			.expect("Failed to find an appropriate adapter");
 
-		let (device, queue) = Self::request_device(&adapter).await.expect("Failed to find a compatible device");
+		let (device, queue) = Self::request_device(&adapter, device_limits).await.expect("Failed to find a compatible device");
 		
         let swapchain_capabilities: wgpu::SurfaceCapabilities = surface.get_capabilities(&adapter);
         let swapchain_format = swapchain_capabilities.formats[0];
@@ -62,7 +61,7 @@ impl Target
 		this
 	}
 
-	async fn request_device(adapter: &wgpu::Adapter) -> Result<(wgpu::Device, wgpu::Queue), wgpu::RequestDeviceError>
+	async fn request_device(adapter: &wgpu::Adapter, device_limits: wgpu::Limits) -> Result<(wgpu::Device, wgpu::Queue), wgpu::RequestDeviceError>
 	{
 		let optional_features = wgpu::Features::SHADER_F64;
 		let available_features = adapter.features();
@@ -73,7 +72,7 @@ impl Target
 				{
 					label: None,
 					features: optional_features & available_features,
-					limits: wgpu::Limits::default(),
+					limits: device_limits.using_resolution(adapter.limits()),
 				},
 				None,
 			).await

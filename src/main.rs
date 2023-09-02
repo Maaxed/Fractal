@@ -1,10 +1,5 @@
-mod target;
-mod compute;
-mod render;
-mod app;
-mod quad_cell;
-
-pub use target::Target;
+use fractal_renderer_lib::*;
+use winit::window::Window;
 
 fn main()
 {
@@ -16,7 +11,8 @@ async fn run()
     env_logger::init();
     let event_loop = winit::event_loop::EventLoop::new();
     
-    let target = Target::new(&event_loop).await;
+    let window: Window = Window::new(&event_loop).expect("Failed to create window");
+    let target = Target::new(window, wgpu::Limits::default()).await;
 
     app::run_app(target, event_loop);
 }

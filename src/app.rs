@@ -293,7 +293,7 @@ impl<C: Compute> App<C>
 								},
 								MouseScrollDelta::PixelDelta(delta) =>
 								{
-									self.app_data.apply_zoom(delta.y * 10.0);
+									self.app_data.apply_zoom(delta.y * 0.01);
 								},
 							}
 						},

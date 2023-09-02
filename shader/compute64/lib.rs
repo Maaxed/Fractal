@@ -5,11 +5,6 @@ use fractal_renderer_shared as shared;
 use spirv_std::spirv;
 use spirv_std::glam::{UVec3, UVec2, uvec2, Vec3Swizzles};
 
-pub fn color_to_byte(color: f32) -> u32
-{
-    (color * 255.5) as u32
-}
-
 const WORKGROUP_SIZE: UVec2 = uvec2(16, 16);
 #[spirv(compute(threads(16, 16)))]
 pub fn compute_mandelbrot(

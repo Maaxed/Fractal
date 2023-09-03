@@ -24,7 +24,6 @@ pub enum FractalKind
     Tricorn,
     BurningShip,
     CosLeaf,
-    MandelbrotNormal,
 
     // Other
     Newton3,
@@ -48,6 +47,7 @@ pub enum RenderTechnique
     Normal,
     OrbitTrapPoint,
     OrbitTrapCross,
+    NormalMap,
 }
 
 #[repr(C)]
@@ -166,20 +166,6 @@ pub fn compute_fractal_color<S: Scalar>(pos: Complex<S>, params: FractalParams<S
         FractalKind::Tricorn => tricorn::tricorn(pos, params),
         FractalKind::BurningShip => burning_ship::burning_ship(pos, params),
         FractalKind::CosLeaf => cos_leaf::cos_leaf(pos, params),
-        FractalKind::MandelbrotNormal =>
-        {
-            let res = mandelbrot::mandelbrot_value_normal(pos, params);
-
-            return match res
-            {
-                EscapeResult::StayedInside => vec3(0.0, 0.0, 0.0),
-                EscapeResult::Escaped(v) =>
-                {
-                    let g = v * 0.9 + 0.1;
-                    Vec3::splat(g)
-                },
-            };
-        },
         FractalKind::Newton3 => return newton::newton3(pos, params),
         FractalKind::Lyapunov =>
         {
@@ -212,16 +198,24 @@ pub fn compute_fractal_color<S: Scalar>(pos: Complex<S>, params: FractalParams<S
         EscapeResult::StayedInside => vec3(0.0, 0.0, 0.0),
         EscapeResult::Escaped(v) =>
         {
-            let v = ln(v);
+            if params.render_technique == RenderTechnique::NormalMap
+            {
+                let g = v * 0.9 + 0.1;
+                Vec3::splat(g)
+            }
+            else
+            {
+                let v = ln(v);
 
-            //Gradient: orange - purple - blue - cyan - white - yellow
-            let v = rem_euclid(v, (PALETTE_SIZE - 1) as f32);
+                //Gradient: orange - purple - blue - cyan - white - yellow
+                let v = rem_euclid(v, (PALETTE_SIZE - 1) as f32);
 
-            let i = floor(v) as usize;
-            let t = v % 1.0;
-            let c1 = PALETTE[i];
-            let c2 = PALETTE[i+1];
-            c1 + (c2 - c1) * t
+                let i = floor(v) as usize;
+                let t = v % 1.0;
+                let c1 = PALETTE[i];
+                let c2 = PALETTE[i+1];
+                c1 + (c2 - c1) * t
+            }
         },
     }
 }

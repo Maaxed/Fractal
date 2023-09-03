@@ -220,7 +220,15 @@ impl ComplexNumber for Complex64
 
     fn argument(self) -> f64
     {
-        self.im().atan2(self.re())
+        
+        if cfg!(target_arch = "spirv")
+        {
+            self.to_complex32().argument() as f64
+        }
+        else
+        {
+            self.im().atan2(self.re())
+        }
     }
 
     fn conjugate(self) -> Self

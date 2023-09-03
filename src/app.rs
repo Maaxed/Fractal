@@ -253,7 +253,6 @@ impl<C: Compute> App<C>
 								VirtualKeyCode::T => self.set_fractal_kind(FractalKind::Tricorn),
 								VirtualKeyCode::S => self.set_fractal_kind(FractalKind::BurningShip),
 								VirtualKeyCode::C => self.set_fractal_kind(FractalKind::CosLeaf),
-								VirtualKeyCode::D => self.set_fractal_kind(FractalKind::MandelbrotNormal),
 								VirtualKeyCode::N => self.set_fractal_kind(FractalKind::Newton3),
 								VirtualKeyCode::L => self.set_fractal_kind(FractalKind::Lyapunov),
 								VirtualKeyCode::J =>
@@ -272,7 +271,8 @@ impl<C: Compute> App<C>
 									{
 										RenderTechnique::Normal => RenderTechnique::OrbitTrapPoint,
 										RenderTechnique::OrbitTrapPoint => RenderTechnique::OrbitTrapCross,
-										RenderTechnique::OrbitTrapCross => RenderTechnique::Normal,
+										RenderTechnique::OrbitTrapCross => RenderTechnique::NormalMap,
+										RenderTechnique::NormalMap => RenderTechnique::Normal,
 									});
 								},
 								VirtualKeyCode::R =>

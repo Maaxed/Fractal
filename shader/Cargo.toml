@@ -1,0 +1,38 @@
+[package]
+name = "fractal_renderer_shader"
+version.workspace = true
+edition.workspace = true
+
+
+[lib]
+name="fractal_renderer_shader"
+crate-type = ["rlib"]
+
+[workspace]
+members = [
+    "vertex32",
+    "vertex64",
+    "fragment",
+    "compute32",
+    "compute64"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+spirv-std = "0.9"
+fractal_renderer_shared = { path = "../shared" }
+
+[build-dependencies]
+spirv-builder = "0.9"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Compile build-dependencies in release mode with the same settings as regular dependencies.
+[profile.release.build-override]
+opt-level = 3
+codegen-units = 16
+[profile.dev.build-override]
+opt-level = 3

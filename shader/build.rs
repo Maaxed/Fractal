@@ -6,11 +6,11 @@ const TARGET: &str = "spirv-unknown-spv1.5";
 
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
-    build_shader("./shader/vertex32", false)?;
-    build_shader("./shader/vertex64", true)?;
-    build_shader("./shader/fragment", false)?;
-    build_shader("./shader/compute32", false)?;
-    build_shader("./shader/compute64", true)?;
+    build_shader("vertex32", false)?;
+    build_shader("vertex64", true)?;
+    build_shader("fragment", false)?;
+    build_shader("compute32", false)?;
+    build_shader("compute64", true)?;
 
     Ok(())
 }

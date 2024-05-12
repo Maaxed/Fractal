@@ -5,24 +5,12 @@ edition.workspace = true
 
 [workspace]
 members = [
-    "shader/vertex32",
-    "shader/vertex64",
-    "shader/fragment",
-    "shader/compute32",
-    "shader/compute64",
-    "shared",
     "run_wasm"
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-
-[workspace.dependencies]
-glam = { version = "0.24", default-features = false }
-bytemuck = { version = "1.13", features = ["derive"] }
-spirv-std = "0.9"
-fractal_renderer_shared = { path = "./shared" }
 
 [lib]
 name="fractal_renderer_lib"
@@ -39,15 +27,16 @@ codegen-units = 16
 opt-level = 3
 
 [build-dependencies]
-spirv-builder = "0.9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
 
 [dependencies]
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
 wgpu = { version = "0.17", features = ["spirv", "vulkan-portability"] }
 winit = "0.28.6"
-glam = { workspace = true, default-features = true, features = ["bytemuck"] }
-bytemuck = { workspace = true }
-fractal_renderer_shared = { workspace = true, features = ["bytemuck"] }
+glam = { version = "0.24", default-features = true, features = ["bytemuck"] }
+bytemuck = { version = "1.13", features = ["derive"] }
+fractal_renderer_shared = { path = "../shared", features = ["bytemuck"] }
 env_logger = "0.10"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

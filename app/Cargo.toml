@@ -32,8 +32,8 @@ serde_json = { version = "1.0" }
 
 [dependencies]
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
-wgpu = { version = "0.18", features = ["spirv", "vulkan-portability"] }
-winit = "0.28.6"
+wgpu = { version = "0.20.0", features = ["spirv", "vulkan-portability"] }
+winit = "0.30.0"
 glam = { version = "0.24", default-features = true, features = ["bytemuck"] }
 bytemuck = { version = "1.13", features = ["derive"] }
 fractal_renderer_shared = { path = "../shared", features = ["bytemuck"] }
@@ -42,7 +42,7 @@ env_logger = "0.11.3"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
 console_log = "1.0"
-wgpu = { version = "0.18", features = ["webgl"] }
+wgpu = { version = "0.20.0", features = ["webgl"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = ["Document", "Window", "Element"] }

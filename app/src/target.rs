@@ -1,19 +1,19 @@
 use winit::{window::Window, dpi::PhysicalSize};
 
 
-pub struct Target
+pub struct Target<'window>
 {
-	pub window: Window,
-	pub surface: wgpu::Surface,
+	pub window: &'window Window,
+	pub surface: wgpu::Surface<'window>,
 	pub config: wgpu::SurfaceConfiguration,
 	pub device: wgpu::Device,
 	pub queue: wgpu::Queue,
 	pub supports_compute_shader: bool,
 }
 
-impl Target
+impl<'w> Target<'w>
 {
-	pub async fn new(window: Window, device_limits: wgpu::Limits) -> Self
+	pub async fn new(window: &'w Window, device_limits: wgpu::Limits) -> Self
 	{
 		let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::all());
 		let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();
@@ -28,7 +28,7 @@ impl Target
 			}
 		);
 		
-		let surface = unsafe { instance.create_surface(&window) }.expect("Failed to create surface");
+		let surface = instance.create_surface(window).expect("Failed to create surface");
 
 		let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
 			.await
@@ -59,15 +59,14 @@ impl Target
 	async fn request_device(adapter: &wgpu::Adapter, device_limits: wgpu::Limits) -> Result<(wgpu::Device, wgpu::Queue), wgpu::RequestDeviceError>
 	{
 		let optional_features = wgpu::Features::SHADER_F64;
-		let available_features = adapter.features();
 
 		adapter
 			.request_device(
 				&wgpu::DeviceDescriptor
 				{
 					label: None,
-					features: optional_features & available_features,
-					limits: device_limits.using_resolution(adapter.limits()),
+					required_features: optional_features,
+					required_limits: device_limits.using_resolution(adapter.limits()),
 				},
 				None,
 			).await

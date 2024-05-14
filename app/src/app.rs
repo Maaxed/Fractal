@@ -5,8 +5,9 @@ use shared::math::*;
 use shared::fractal::{FractalKind, FractalVariation, RenderTechnique};
 use glam::{dvec2, DVec2, i64vec2};
 use winit::dpi::{PhysicalPosition, PhysicalSize};
-use winit::event_loop::{EventLoop, ControlFlow};
-use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseScrollDelta, MouseButton};
+use winit::event_loop::EventLoop;
+use winit::event::{ElementState, Event, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
+use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::{Target, render};
 use crate::quad_cell::QuadPos;
@@ -19,9 +20,9 @@ const FRAGMENT_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader
 const COMPUTE32_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_compute32.spv"));
 const COMPUTE64_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_compute64.spv"));
 
-pub struct App<C>
+pub struct App<'window, C>
 {
-	target: Target,
+	target: Target<'window>,
 	render: Render,
 	compute: C,
 	app_data: AppData,
@@ -29,7 +30,7 @@ pub struct App<C>
 	mouse_right_down: bool,
 }
 
-pub fn run_app(target: Target, event_loop: EventLoop<()>) -> !
+pub fn run_app(target: Target, event_loop: EventLoop<()>)
 {
 	let use_double_precision = target.device.features().contains(wgpu::Features::SHADER_F64);
 
@@ -87,9 +88,9 @@ pub fn run_app(target: Target, event_loop: EventLoop<()>) -> !
 
 }
 
-impl<C: Compute> App<C>
+impl<'w, C: Compute> App<'w, C>
 {
-	pub fn new(target: Target, compute: C, render: Render, cell_size: PhysicalSize<u32>) -> Self
+	pub fn new(target: Target<'w>, compute: C, render: Render, cell_size: PhysicalSize<u32>) -> Self
 	{
 		let screen_size = target.window.inner_size();
 		Self
@@ -193,26 +194,13 @@ impl<C: Compute> App<C>
 		Ok(())
 	}
 
-	pub fn run(mut self, event_loop: EventLoop<()>) -> !
+	pub fn run(mut self, event_loop: EventLoop<()>)
 	{
 		event_loop.run(move
-			|event, _, control_flow|
+			|event, context|
 			match event
 			{
-				Event::RedrawRequested(window_id) if window_id == self.target.window.id() =>
-				{
-					match self.redraw()
-					{
-						Ok(_) => {},
-						// Reconfigure the surface if lost
-						Err(wgpu::SurfaceError::Lost) => self.target.configure_surface(),
-						// The system is out of memory, we should probably quit
-						Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-						// All other errors (Outdated, Timeout) should be resolved by the next frame
-						Err(e @ wgpu::SurfaceError::Outdated | e @ wgpu::SurfaceError::Timeout) => eprintln!("{:?}", e),
-					}
-				},
-				Event::MainEventsCleared =>
+				Event::AboutToWait =>
 				{
 					if self.app_data.require_redraw
 					{
@@ -224,22 +212,35 @@ impl<C: Compute> App<C>
 				{
 					match event
 					{
-						WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+						WindowEvent::RedrawRequested =>
+						{
+							match self.redraw()
+							{
+								Ok(_) => {},
+								// Reconfigure the surface if lost
+								Err(wgpu::SurfaceError::Lost) => self.target.configure_surface(),
+								// The system is out of memory, we should probably quit
+								Err(wgpu::SurfaceError::OutOfMemory) => context.exit(),
+								// All other errors (Outdated, Timeout) should be resolved by the next frame
+								Err(e @ wgpu::SurfaceError::Outdated | e @ wgpu::SurfaceError::Timeout) => eprintln!("{:?}", e),
+							}
+						},
+						WindowEvent::CloseRequested => context.exit(),
 						WindowEvent::Resized(physical_size) =>
 						{
 							self.resize(*physical_size);
 						},
-						WindowEvent::ScaleFactorChanged { new_inner_size, .. } =>
+						/*WindowEvent::ScaleFactorChanged { new_inner_size, .. } =>
 						{
 							// new_inner_size is &&mut so we have to dereference it twice
 							self.resize(**new_inner_size);
-						},
+						},*/
 						WindowEvent::KeyboardInput
 						{
-							input: KeyboardInput
+							event: KeyEvent
 								{
 									state: ElementState::Pressed,
-									virtual_keycode: Some(keycode),
+									physical_key: PhysicalKey::Code(keycode),
 									..
 								},
 							..
@@ -247,15 +248,15 @@ impl<C: Compute> App<C>
 						{
 							match keycode
 							{
-								VirtualKeyCode::Escape => *control_flow = ControlFlow::Exit,
-								VirtualKeyCode::M => self.set_fractal_kind(FractalKind::MandelbrotSet),
-								VirtualKeyCode::Comma | VirtualKeyCode::Key3 | VirtualKeyCode::Numpad3 => self.set_fractal_kind(FractalKind::Multibrot3),
-								VirtualKeyCode::T => self.set_fractal_kind(FractalKind::Tricorn),
-								VirtualKeyCode::S => self.set_fractal_kind(FractalKind::BurningShip),
-								VirtualKeyCode::C => self.set_fractal_kind(FractalKind::CosLeaf),
-								VirtualKeyCode::N => self.set_fractal_kind(FractalKind::Newton3),
-								VirtualKeyCode::L => self.set_fractal_kind(FractalKind::Lyapunov),
-								VirtualKeyCode::J =>
+								KeyCode::Escape => context.exit(),
+								KeyCode::KeyM => self.set_fractal_kind(FractalKind::MandelbrotSet),
+								KeyCode::Comma | KeyCode::Digit3 | KeyCode::Numpad3 => self.set_fractal_kind(FractalKind::Multibrot3),
+								KeyCode::KeyT => self.set_fractal_kind(FractalKind::Tricorn),
+								KeyCode::KeyS => self.set_fractal_kind(FractalKind::BurningShip),
+								KeyCode::KeyC => self.set_fractal_kind(FractalKind::CosLeaf),
+								KeyCode::KeyN => self.set_fractal_kind(FractalKind::Newton3),
+								KeyCode::KeyL => self.set_fractal_kind(FractalKind::Lyapunov),
+								KeyCode::KeyJ =>
 								{
 									self.set_fractal_variation(match self.app_data.fractal_params.variation
 									{
@@ -265,7 +266,7 @@ impl<C: Compute> App<C>
 									(self.app_data.pos, self.app_data.fractal_params.secondary_pos) = (self.app_data.fractal_params.secondary_pos.to_vector(), Complex64::from_vector(self.app_data.pos));
 									(self.app_data.zoom, self.app_data.secondary_zoom) = (self.app_data.secondary_zoom, self.app_data.zoom);
 								},
-								VirtualKeyCode::O =>
+								KeyCode::KeyO =>
 								{
 									self.set_fractal_rendering(match self.app_data.fractal_params.render_technique
 									{
@@ -275,7 +276,7 @@ impl<C: Compute> App<C>
 										RenderTechnique::NormalMap => RenderTechnique::Normal,
 									});
 								},
-								VirtualKeyCode::R =>
+								KeyCode::KeyR =>
 								{
 									self.app_data.reset();
 									self.target.window.request_redraw();
@@ -328,7 +329,7 @@ impl<C: Compute> App<C>
 					}
 				},
 				_ => {}
-			})
+			}).expect("Failed to run event loop")
 	}
 }
 

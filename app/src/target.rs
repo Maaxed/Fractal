@@ -15,11 +15,18 @@ impl Target
 {
 	pub async fn new(window: Window, device_limits: wgpu::Limits) -> Self
 	{
-		window.set_title("Fractal");
-
 		let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::all());
 		let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();
-		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { backends, dx12_shader_compiler });
+		let gles_minor_version = wgpu::util::gles_minor_version_from_env().unwrap_or_default();
+		let instance = wgpu::Instance::new(
+			wgpu::InstanceDescriptor
+			{
+				backends,
+				flags: wgpu::InstanceFlags::default(),
+				dx12_shader_compiler,
+				gles_minor_version
+			}
+		);
 		
 		let surface = unsafe { instance.create_surface(&window) }.expect("Failed to create surface");
 
@@ -29,20 +36,8 @@ impl Target
 
 		let (device, queue) = Self::request_device(&adapter, device_limits).await.expect("Failed to find a compatible device");
 		
-        let swapchain_capabilities: wgpu::SurfaceCapabilities = surface.get_capabilities(&adapter);
-        let swapchain_format = swapchain_capabilities.formats[0];
-
         let window_size = window.inner_size();
-        let config = wgpu::SurfaceConfiguration
-        {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: swapchain_format,
-            width: window_size.width,
-            height: window_size.height,
-            present_mode: swapchain_capabilities.present_modes[0],
-            alpha_mode: swapchain_capabilities.alpha_modes[0],
-            view_formats: vec![],
-        };
+        let config = surface.get_default_config(&adapter, window_size.width, window_size.height).expect("Surface not supported by adapter");
 
 		let supports_compute_shader = adapter.get_downlevel_capabilities().flags.contains(wgpu::DownlevelFlags::COMPUTE_SHADERS);
 

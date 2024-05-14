@@ -182,7 +182,7 @@ impl ShaderCompute
 
     pub fn make_compute_pass(&self, commands: &mut CommandEncoder)
     {
-        let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
+        let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None, timestamp_writes: None });
         compute_pass.set_bind_group(0, &self.dynamic.bind_group, &[]);
         compute_pass.set_pipeline(&self.fixed.compute_pipeline);
         compute_pass.dispatch_workgroups(self.dynamic.size.width / self.fixed.workgroup_size.x, self.dynamic.size.height / self.fixed.workgroup_size.y, 1);

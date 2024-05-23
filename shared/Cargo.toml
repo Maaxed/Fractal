@@ -6,7 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+default = ["std", "bytemuck"]
 bytemuck = ["dep:bytemuck", "glam/bytemuck"]
+std = ["glam/std", "num-traits/std"]
+libm = ["glam/libm", "num-traits/libm"]
 
 [profile.release.build-override]
 opt-level = 3

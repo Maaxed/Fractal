@@ -22,8 +22,8 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
+fractal_renderer_shared = { path = "../shared", default-features = false, features = ["libm"] }
 spirv-std = "0.9"
-fractal_renderer_shared = { path = "../shared" }
 
 [build-dependencies]
 spirv-builder = "0.9"

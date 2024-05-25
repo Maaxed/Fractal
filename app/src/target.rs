@@ -1,20 +1,21 @@
 use winit::{window::Window, dpi::PhysicalSize};
+use std::sync::Arc;
 
-
-pub struct Target<'window>
+pub struct Target
 {
-	pub window: &'window Window,
-	pub surface: wgpu::Surface<'window>,
+	pub window: Arc<Window>,
+	pub surface: wgpu::Surface<'static>,
 	pub config: wgpu::SurfaceConfiguration,
 	pub device: wgpu::Device,
 	pub queue: wgpu::Queue,
 	pub supports_compute_shader: bool,
 }
 
-impl<'w> Target<'w>
+impl Target
 {
-	pub async fn new(window: &'w Window, device_limits: wgpu::Limits) -> Self
+	pub async fn new(window: Window, device_limits: wgpu::Limits) -> Self
 	{
+		let window = Arc::new(window);
 		let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::all());
 		let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();
 		let gles_minor_version = wgpu::util::gles_minor_version_from_env().unwrap_or_default();
@@ -28,7 +29,7 @@ impl<'w> Target<'w>
 			}
 		);
 		
-		let surface = instance.create_surface(window).expect("Failed to create surface");
+		let surface = instance.create_surface(Arc::clone(&window)).expect("Failed to create surface");
 
 		let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
 			.await
@@ -36,7 +37,14 @@ impl<'w> Target<'w>
 
 		let (device, queue) = Self::request_device(&adapter, device_limits).await.expect("Failed to find a compatible device");
 		
-        let window_size = window.inner_size();
+        let mut window_size = window.inner_size();
+
+		if window_size.width == 0 || window_size.height == 0
+		{
+			window_size.width = 1280;
+			window_size.height = 720;
+		}
+
         let config = surface.get_default_config(&adapter, window_size.width, window_size.height).expect("Surface not supported by adapter");
 
 		let supports_compute_shader = adapter.get_downlevel_capabilities().flags.contains(wgpu::DownlevelFlags::COMPUTE_SHADERS);
@@ -59,13 +67,14 @@ impl<'w> Target<'w>
 	async fn request_device(adapter: &wgpu::Adapter, device_limits: wgpu::Limits) -> Result<(wgpu::Device, wgpu::Queue), wgpu::RequestDeviceError>
 	{
 		let optional_features = wgpu::Features::SHADER_F64;
+		let available_features = adapter.features();
 
 		adapter
 			.request_device(
 				&wgpu::DeviceDescriptor
 				{
 					label: None,
-					required_features: optional_features,
+					required_features: optional_features & available_features,
 					required_limits: device_limits.using_resolution(adapter.limits()),
 				},
 				None,

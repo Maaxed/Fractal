@@ -32,7 +32,7 @@ serde_json = { version = "1.0" }
 
 [dependencies]
 fractal_renderer_shared = { path = "../shared", features = ["bytemuck"] }
-futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
+pollster = "0.3.0"
 wgpu = { version = "0.20.0", features = ["spirv", "vulkan-portability"] }
 winit = "0.30.0"
 glam = { version = "0.24", features = ["bytemuck"] }

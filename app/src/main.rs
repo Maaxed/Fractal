@@ -1,19 +1,11 @@
-use fractal_renderer_lib::*;
-use winit::window::{Window, WindowAttributes};
+use fractal_renderer_lib::app::AppWrapper;
 
-fn main()
-{
-    futures::executor::block_on(run());
-}
-
-async fn run()
+fn main() -> Result<(), winit::error::EventLoopError>
 {
     env_logger::init();
     let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop");
     
-    let window_attributes = WindowAttributes::default().with_title("Fractal");
-    let window: Window = event_loop.create_window(window_attributes).expect("Failed to create window");
-    let target = Target::new(&window, wgpu::Limits::default()).await;
+    let mut app = AppWrapper::new(wgpu::Limits::default(), |_window| {});
 
-    app::run_app(target, event_loop);
+    event_loop.run_app(&mut app)
 }

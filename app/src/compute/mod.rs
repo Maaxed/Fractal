@@ -1,7 +1,9 @@
-mod shader;
+mod compute_shader;
+mod render_shader;
 mod threaded;
 
-pub use shader::*;
+pub use compute_shader::*;
+pub use render_shader::*;
 pub use threaded::*;
 
 use crate::Target;

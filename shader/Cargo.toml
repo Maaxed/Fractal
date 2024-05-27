@@ -14,7 +14,9 @@ members = [
     "vertex64",
     "fragment",
     "compute32",
-    "compute64"
+    "compute64",
+    "computation32",
+    "computation64"
 ]
 
 [workspace.package]

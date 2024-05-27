@@ -9,8 +9,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     build_shader("vertex32", false)?;
     build_shader("vertex64", true)?;
     build_shader("fragment", false)?;
+
     build_shader("compute32", false)?;
     build_shader("compute64", true)?;
+    
+    build_shader("computation32", false)?;
+    build_shader("computation64", true)?;
 
     Ok(())
 }

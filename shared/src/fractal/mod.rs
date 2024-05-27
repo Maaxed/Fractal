@@ -59,6 +59,9 @@ pub struct FractalParams32
     pub fractal_kind: FractalKind,
     pub variation: FractalVariation,
     pub render_technique: RenderTechnique,
+    padding0: u32,
+    padding1: u32,
+    padding2: u32,
 }
 
 impl Default for FractalParams32
@@ -71,6 +74,9 @@ impl Default for FractalParams32
             fractal_kind: FractalKind::MandelbrotSet,
             variation: FractalVariation::Normal,
             render_technique: RenderTechnique::Normal,
+            padding0: 0,
+            padding1: 0,
+            padding2: 0,
         }
     }
 }
@@ -97,7 +103,7 @@ impl Default for FractalParams64
             fractal_kind: FractalKind::MandelbrotSet,
             variation: FractalVariation::Normal,
             render_technique: RenderTechnique::Normal,
-            padding0: Default::default(),
+            padding0: 0,
         }
     }
 }
@@ -112,6 +118,7 @@ impl From<FractalParams64> for FractalParams32
             fractal_kind: value.fractal_kind,
             variation: value.variation,
             render_technique: value.render_technique,
+            ..Default::default()
         }
     }
 }

@@ -13,21 +13,21 @@ use winit::window::WindowAttributes;
 
 use crate::{Target, render};
 use crate::quad_cell::QuadPos;
-use crate::compute::{Compute, AnyCompute};
+use crate::compute::{Compute, ShaderRenderCompute};
 use crate::render::Render;
 
 const VERTEX32_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_vertex32.spv"));
 const VERTEX64_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_vertex64.spv"));
 const FRAGMENT_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_fragment.spv"));
-const COMPUTE32_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_compute32.spv"));
-const COMPUTE64_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_compute64.spv"));
+const COMPUTE32_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_computation32.spv")); // fractal_renderer_shader_compute32.spv
+const COMPUTE64_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_computation64.spv")); // fractal_renderer_shader_compute64.spv
 
 #[derive(Default)]
 pub struct AppWrapper<Init>
 {
 	device_limits: wgpu::Limits,
 	init_function: Init,
-	app: Option<App<AnyCompute>>
+	app: Option<App<ShaderRenderCompute>>
 }
 
 impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
@@ -87,7 +87,7 @@ impl<Init: Fn(& winit::window::Window)> ApplicationHandler for AppWrapper<Init>
 				source: wgpu::util::make_spirv(compute_shader_code),
 			});
 
-		let (cell_size, compute) = if target.supports_compute_shader
+		/*let (cell_size, compute) = if target.supports_compute_shader
 		{
 			let cell_size = PhysicalSize::new(256, 256);
 
@@ -103,7 +103,10 @@ impl<Init: Fn(& winit::window::Window)> ApplicationHandler for AppWrapper<Init>
 			let compute = crate::compute::ThreadedCompute::new(cell_size);
 			
 			(cell_size, AnyCompute::Threaded(compute))
-		};
+		};*/
+
+		let cell_size = PhysicalSize::new(256, 256);
+		let compute = crate::compute::ShaderRenderCompute::new(&target, &compute_shader_module, &compute_shader_module, cell_size, use_double_precision);
 
 		let render = Render::new(&target, &vertex_shader_module, &fragment_shader_module, cell_size, use_double_precision);
 		

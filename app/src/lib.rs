@@ -1,6 +1,6 @@
 mod target;
-mod compute;
-mod render;
+pub mod compute;
+pub mod render;
 mod quad_cell;
 pub mod app;
 

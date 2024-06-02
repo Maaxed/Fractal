@@ -67,6 +67,8 @@ impl ShaderRenderCompute
                 push_constant_ranges: &[],
             });
 
+        let format = target.config.format.remove_srgb_suffix();
+
         let render_pipeline = target.device.create_render_pipeline(
             &wgpu::RenderPipelineDescriptor
             {
@@ -83,7 +85,7 @@ impl ShaderRenderCompute
                 {
                     module: fragment_shader_module,
                     entry_point: "fragment",
-                    targets: &[Some(target.config.format.into())],
+                    targets: &[Some(format.into())],
                     //compilation_options: Default::default(),
                 }),
                 primitive: wgpu::PrimitiveState::default(),
@@ -119,9 +121,9 @@ impl ShaderRenderCompute
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
-                format: target.config.format,
+                format,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-                view_formats: &target.config.view_formats,
+                view_formats: &[format],
             }
         );
         

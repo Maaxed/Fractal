@@ -77,14 +77,14 @@ impl ShaderRenderCompute
                     module: vertex_shader_module,
                     entry_point: "vertex",
                     buffers: &[],
-                    compilation_options: Default::default(),
+                    //compilation_options: Default::default(),
                 },
                 fragment: Some(wgpu::FragmentState
                 {
                     module: fragment_shader_module,
                     entry_point: "fragment",
                     targets: &[Some(target.config.format.into())],
-                    compilation_options: Default::default(),
+                    //compilation_options: Default::default(),
                 }),
                 primitive: wgpu::PrimitiveState::default(),
                 depth_stencil: None,

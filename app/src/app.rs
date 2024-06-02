@@ -1,16 +1,18 @@
 use std::collections::BTreeMap;
 
+use egui::InnerResponse;
 use fractal_renderer_shared as shared;
 use pollster::FutureExt;
 use shared::math::*;
 use shared::fractal::{FractalKind, FractalVariation, RenderTechnique};
 use glam::{dvec2, DVec2, i64vec2};
-use winit::application::ApplicationHandler;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::WindowAttributes;
+use winit::window::WindowBuilder;
+use winit::event::Event as WinitEvent;
 
+use crate::gui::EguiRenderer;
 use crate::{Target, render};
 use crate::quad_cell::QuadPos;
 use crate::compute::{Compute, ShaderRenderCompute};
@@ -27,7 +29,7 @@ pub struct AppWrapper<Init>
 {
 	device_limits: wgpu::Limits,
 	init_function: Init,
-	app: Option<App<ShaderRenderCompute>>
+	_app: Option<App<ShaderRenderCompute>>
 }
 
 impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
@@ -38,21 +40,32 @@ impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
 		{
 			device_limits,
 			init_function,
-			app: None,
+			_app: None,
 		}
 	}
-}
 
-impl<Init: Fn(& winit::window::Window)> ApplicationHandler for AppWrapper<Init>
-{
-	fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop)
+	pub fn run(self, event_loop: winit::event_loop::EventLoop<()>) -> Result<(), winit::error::EventLoopError>
 	{
-    	let window_attributes = WindowAttributes::default().with_title("Fractal").with_maximized(true);
-		let window = event_loop.create_window(window_attributes).expect("Failed to create window");
+    	let window_attributes = WindowBuilder::default().with_title("Fractal").with_maximized(true);
+		let window = window_attributes.build(&event_loop).expect("Failed to create window");
 
+		let mut app = self.build_app(window);
+		event_loop.run(|event, ctx|
+		{
+			match event
+			{
+				WinitEvent::AboutToWait => app.about_to_wait(ctx),
+				WinitEvent::WindowEvent { window_id, event } => app.window_event(ctx, window_id, event),
+				_ => {},
+			}
+		})
+	}
+
+	fn build_app(&self, window: winit::window::Window) -> App<ShaderRenderCompute>
+	{
 		(self.init_function)(&window);
 
-    	let target = Target::new(window, self.device_limits.clone()).block_on();
+		let target = Target::new(window, self.device_limits.clone()).block_on();
 		
 		let use_double_precision = target.device.features().contains(wgpu::Features::SHADER_F64);
 
@@ -110,7 +123,20 @@ impl<Init: Fn(& winit::window::Window)> ApplicationHandler for AppWrapper<Init>
 
 		let render = Render::new(&target, &vertex_shader_module, &fragment_shader_module, cell_size, use_double_precision);
 		
-		self.app = Some(App::new(target, compute, render, cell_size));
+		App::new(target, compute, render, cell_size)
+	}
+}
+
+/*impl<Init: Fn(&winit::window::Window)> ApplicationHandler for AppWrapper<Init>
+{
+	fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop)
+	{
+    	let window_attributes = WindowAttributes::default().with_title("Fractal").with_maximized(true);
+		let window = event_loop.create_window(window_attributes).expect("Failed to create window");
+
+		(self.init_function)(&window);
+
+		self.app = Some(build_app(window));
 	}
 
 	fn window_event(
@@ -127,11 +153,12 @@ impl<Init: Fn(& winit::window::Window)> ApplicationHandler for AppWrapper<Init>
 	{
 		self.app.as_mut().unwrap().about_to_wait(event_loop);
 	}
-}
+}*/
 
 pub struct App<C>
 {
 	target: Target,
+	gui: EguiRenderer,
 	render: Render,
 	compute: C,
 	app_data: AppData,
@@ -143,10 +170,12 @@ impl<C: Compute> App<C>
 {
 	pub fn new(target: Target, compute: C, render: Render, cell_size: PhysicalSize<u32>) -> Self
 	{
+		let gui = EguiRenderer::new(&target);
 		let screen_size = target.window.inner_size();
 		Self
 		{
 			target,
+			gui,
 			render,
 			compute,
 			app_data: AppData::new(cell_size, screen_size),
@@ -221,6 +250,13 @@ impl<C: Compute> App<C>
 			});
 
 		self.render.make_render_pass(self.app_data.cells.values(), &view, commands);
+
+		let mut changed = false;
+		self.gui.draw(&self.target, commands, &view, |ui| changed = self.app_data.gui(ui));
+		if changed
+		{
+			self.reset_fractal_rendering();
+		}
 	}
 
 	pub fn redraw(&mut self) -> Result<(), wgpu::SurfaceError>
@@ -247,11 +283,19 @@ impl<C: Compute> App<C>
 
 	fn window_event(
 		&mut self,
-		event_loop: &winit::event_loop::ActiveEventLoop,
+		//event_loop: &winit::event_loop::ActiveEventLoop,
+		event_loop: &winit::event_loop::EventLoopWindowTarget<()>,
 		window_id: winit::window::WindowId,
 		event: WindowEvent,
 	)
 	{
+		let response = self.gui.handle_input(&self.target, &event);
+
+		if response.repaint
+		{
+			self.app_data.require_redraw = true;
+		}
+
 		if window_id != self.target.window.id()
 		{
 			return;
@@ -288,6 +332,11 @@ impl<C: Compute> App<C>
 				..
 			} =>
 			{
+				if response.consumed
+				{
+					return;
+				}
+
 				match keycode
 				{
 					KeyCode::Escape => event_loop.exit(),
@@ -328,6 +377,11 @@ impl<C: Compute> App<C>
 			},
 			WindowEvent::MouseWheel { delta, .. } =>
 			{
+				if response.consumed
+				{
+					return;
+				}
+				
 				match delta
 				{
 					MouseScrollDelta::LineDelta(_dx, dy) =>
@@ -344,8 +398,20 @@ impl<C: Compute> App<C>
 			{
 				match button
 				{
-					MouseButton::Left => self.mouse_left_down = *state == ElementState::Pressed,
-					MouseButton::Right => self.mouse_right_down = *state == ElementState::Pressed,
+					MouseButton::Left =>
+					{
+						if !response.consumed || self.mouse_left_down
+						{
+							self.mouse_left_down = *state == ElementState::Pressed;
+						}
+					},
+					MouseButton::Right =>
+					{
+						if !response.consumed || self.mouse_right_down
+						{
+							self.mouse_right_down = *state == ElementState::Pressed;
+						}
+					},
 					_ => {},
 				}
 			},
@@ -371,7 +437,7 @@ impl<C: Compute> App<C>
 		}
 	}
 
-	fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop)
+	fn about_to_wait(&mut self, _event_loop: &winit::event_loop::EventLoopWindowTarget<()> /*&winit::event_loop::ActiveEventLoop*/)
 	{
 		if self.app_data.require_redraw
 		{
@@ -523,5 +589,126 @@ impl AppData
 		self.require_redraw = true;
 
 		&self.cells[&pos]
+	}
+
+	pub fn gui(&mut self, ctx: &egui::Context) -> bool
+	{
+		let response = egui::Window::new("Fractal")
+			.resizable(false)
+			.show(ctx, |ui|
+			{
+				fn select_in_list<T: Eq>(ui: &mut egui::Ui, selected_value: &mut T, list: impl IntoIterator<Item = (T, &'static str)>) -> bool
+				{
+					ui.horizontal(|ui|
+					{
+						let mut changed = false;
+	
+						for (value, name) in list
+						{
+							if ui.selectable_label(*selected_value == value, name).clicked()
+							{
+								if *selected_value != value
+								{
+									*selected_value = value;
+									
+									changed = true;
+								}
+							}
+						}
+	
+						changed
+					}).inner
+				}
+
+				egui::Grid::new("config_grid")
+					.num_columns(2)
+					.striped(true)
+					.show(ui, |ui|
+					{
+						let mut changed = false;
+						
+						ui.label("Fractal Kind");
+						changed |= select_in_list(ui, &mut self.fractal_params.fractal_kind, [
+							(FractalKind::MandelbrotSet, "Mandelbrot Set"),
+							(FractalKind::Multibrot3, "Multibrot 3"),
+							(FractalKind::Tricorn, "Tricorn"),
+							(FractalKind::BurningShip, "Burning Ship"),
+							(FractalKind::CosLeaf, "Cos Leaf"),
+							(FractalKind::Newton3, "Newton 3"),
+							(FractalKind::Lyapunov, "Lyapunov"),
+						]);
+						ui.end_row();
+		
+						ui.label("Variation");
+						if select_in_list(ui, &mut self.fractal_params.variation, [
+							(FractalVariation::Normal, "Classic"),
+							(FractalVariation::JuliaSet, "Julia Set"),
+						])
+						{
+							// Swap primary and secondary pos/zoom
+							(self.pos, self.fractal_params.secondary_pos) = (self.fractal_params.secondary_pos.to_vector(), Complex64::from_vector(self.pos));
+							(self.zoom, self.secondary_zoom) = (self.secondary_zoom, self.zoom);
+							changed = true;
+						}
+						ui.end_row();
+		
+						ui.label("Render Technique");
+						changed |= select_in_list(ui, &mut self.fractal_params.render_technique, [
+							(RenderTechnique::Normal, "Normal"),
+							(RenderTechnique::OrbitTrapPoint, "Orbit Trap Point"),
+							(RenderTechnique::OrbitTrapCross, "Orbit Trap Cross"),
+							(RenderTechnique::NormalMap, "Normal Map"),
+						]);
+						ui.end_row();
+						
+						ui.label("Position");
+						ui.horizontal(|ui|
+						{
+							let speed = self.zoom * 0.05;
+							ui.add(egui::DragValue::new(&mut self.pos.x).speed(speed).prefix("x: "));
+							ui.add(egui::DragValue::new(&mut self.pos.y).speed(speed).prefix("y: "));
+						});
+						ui.end_row();
+						
+						ui.label("C Constant");
+						ui.horizontal(|ui|
+						{
+							let speed = self.zoom * 0.05;
+							changed |= ui.add(egui::DragValue::new(self.fractal_params.secondary_pos.re_mut()).speed(speed).prefix("x: ")).changed();
+							changed |= ui.add(egui::DragValue::new(self.fractal_params.secondary_pos.im_mut()).speed(speed).prefix("y: ")).changed();
+						});
+						ui.end_row();
+						
+						ui.label("Zoom");
+						ui.horizontal(|ui|
+						{
+							let speed = self.zoom * 0.02;
+							ui.add(egui::DragValue::new(&mut self.zoom).speed(speed).suffix("x").clamp_range(f64::MIN_POSITIVE..=f64::MAX));
+						});
+						ui.end_row();
+		
+						ui.label("");
+						if ui.button("Reset").clicked()
+						{
+							self.reset();
+							changed = true;
+						}
+						ui.end_row();
+		
+						changed
+					}).inner
+			});
+
+		let changed = match response
+		{
+			Some(InnerResponse{ inner: Some(true), .. }) => true,
+			_ => false,
+		};
+
+		if changed
+		{
+			self.require_redraw = true;
+		}
+		changed
 	}
 }

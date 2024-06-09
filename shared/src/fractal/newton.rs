@@ -7,7 +7,7 @@ use crate::math::*;
 
 use super::{FractalParams, FractalVariation};
 
-const ITERATION_COUNT: u32 = 128;
+pub const ITERATION_COUNT: u32 = 128;
 
 pub fn newton3<S: Scalar>(pos: Complex<S>, params: FractalParams<S>) -> Vec3
 {
@@ -18,7 +18,7 @@ pub fn newton3<S: Scalar>(pos: Complex<S>, params: FractalParams<S>) -> Vec3
         FractalVariation::Normal => (pos, ComplexNumber::ZERO),
         FractalVariation::JuliaSet => (params.secondary_pos, pos),
     };
-    newton::<S, _, 3>(ITERATION_COUNT, ComplexNumber::ONE, c, z,
+    newton::<S, _, 3>(params.iteration_limit, ComplexNumber::ONE, c, z,
         [
             ComplexNumber::from_complex32(Complex32::new(1.0, 0.0)),
             ComplexNumber::from_complex32(Complex32::new(-0.5, 3.0f32.sqrt() / 2.0)),

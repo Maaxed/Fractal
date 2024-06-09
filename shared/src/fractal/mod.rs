@@ -30,6 +30,25 @@ pub enum FractalKind
     Lyapunov,
 }
 
+impl FractalKind
+{
+    pub fn default_iteration_limit(&self) -> u32
+    {
+        use FractalKind::*;
+        
+        match self
+        {
+            MandelbrotSet => mandelbrot::ITERATION_COUNT,
+            Multibrot3 => multibrot::ITERATION_COUNT,
+            Tricorn => tricorn::ITERATION_COUNT,
+            BurningShip => burning_ship::ITERATION_COUNT,
+            CosLeaf => cos_leaf::ITERATION_COUNT,
+            Newton3 => newton::ITERATION_COUNT,
+            Lyapunov => lyapunov::ITERATION_COUNT,
+        }
+    }
+}
+
 #[repr(u32)]
 #[cfg_attr(feature = "bytemuck", derive(NoUninit))]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -59,9 +78,9 @@ pub struct FractalParams32
     pub fractal_kind: FractalKind,
     pub variation: FractalVariation,
     pub render_technique: RenderTechnique,
+    pub iteration_limit: u32,
     padding0: u32,
     padding1: u32,
-    padding2: u32,
 }
 
 impl Default for FractalParams32
@@ -74,9 +93,9 @@ impl Default for FractalParams32
             fractal_kind: FractalKind::MandelbrotSet,
             variation: FractalVariation::Normal,
             render_technique: RenderTechnique::Normal,
+            iteration_limit: 0,
             padding0: 0,
             padding1: 0,
-            padding2: 0,
         }
     }
 }
@@ -90,7 +109,7 @@ pub struct FractalParams64
     pub fractal_kind: FractalKind,
     pub variation: FractalVariation,
     pub render_technique: RenderTechnique,
-    padding0: u32,
+    pub iteration_limit: u32,
 }
 
 impl Default for FractalParams64
@@ -103,7 +122,7 @@ impl Default for FractalParams64
             fractal_kind: FractalKind::MandelbrotSet,
             variation: FractalVariation::Normal,
             render_technique: RenderTechnique::Normal,
-            padding0: 0,
+            iteration_limit: FractalKind::MandelbrotSet.default_iteration_limit(),
         }
     }
 }
@@ -131,6 +150,7 @@ pub struct FractalParams<S: Scalar>
     pub fractal_kind: FractalKind,
     pub variation: FractalVariation,
     pub render_technique: RenderTechnique,
+    pub iteration_limit: u32,
 }
 
 impl From<FractalParams32> for FractalParams<f32>
@@ -143,6 +163,7 @@ impl From<FractalParams32> for FractalParams<f32>
             fractal_kind: value.fractal_kind,
             variation: value.variation,
             render_technique: value.render_technique,
+            iteration_limit: value.iteration_limit,
         }
     }
 }
@@ -157,6 +178,7 @@ impl From<FractalParams64> for FractalParams<f64>
             fractal_kind: value.fractal_kind,
             variation: value.variation,
             render_technique: value.render_technique,
+            iteration_limit: value.iteration_limit,
         }
     }
 }
@@ -176,7 +198,7 @@ pub fn compute_fractal_color<S: Scalar>(pos: Complex<S>, params: FractalParams<S
         FractalKind::Newton3 => return newton::newton3(pos, params),
         FractalKind::Lyapunov =>
         {
-            let v = lyapunov::lyapunov::<S, 2>(&[false, true], pos.to_vector());
+            let v = lyapunov::lyapunov::<S, 2>(&[false, true], pos.to_vector(), params.iteration_limit);
             let y: f32 = if v >= 0.0 { 0.0 } else { sqrt(exp(v)) };
             let r = y;
             let g = 1.0 - pow(1.0 - y, 0.55);

@@ -12,8 +12,6 @@ use crate::render::Render;
 
 pub trait Compute: Sized + 'static
 {
-    fn reset(&mut self);
-
     fn update_before_render(&mut self, target: &Target, render: &Render, app: &mut AppData, commands: &mut wgpu::CommandEncoder);
 }
 
@@ -25,15 +23,6 @@ pub enum AnyCompute
 
 impl Compute for AnyCompute
 {
-    fn reset(&mut self)
-    {
-        match self
-        {
-            Self::Shader(shader) => shader.reset(),
-            Self::Threaded(threaded) => threaded.reset(),
-        }
-    }
-
     fn update_before_render(&mut self, target: &Target, render: &Render, app: &mut AppData, commands: &mut wgpu::CommandEncoder)
     {
         match self

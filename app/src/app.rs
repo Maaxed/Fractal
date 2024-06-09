@@ -190,54 +190,6 @@ impl<C: Compute> App<C>
 		self.app_data.resize(new_size);
     }
 
-	fn reset_fractal_rendering(&mut self)
-	{
-		self.app_data.cells.clear();
-		self.compute.reset();
-	}
-
-	fn set_fractal_kind(&mut self, fractal_kind: FractalKind)
-	{
-		if self.app_data.fractal_params.fractal_kind == fractal_kind
-		{
-			return;
-		}
-
-		self.reset_fractal_rendering();
-
-		self.app_data.fractal_params.fractal_kind = fractal_kind;
-		
-		self.app_data.require_redraw = true;
-	}
-
-	fn set_fractal_variation(&mut self, fractal_variation: FractalVariation)
-	{
-		if self.app_data.fractal_params.variation == fractal_variation
-		{
-			return;
-		}
-
-		self.reset_fractal_rendering();
-
-		self.app_data.fractal_params.variation = fractal_variation;
-		
-		self.app_data.require_redraw = true;
-	}
-
-	fn set_fractal_rendering(&mut self, rendering_technique: RenderTechnique)
-	{
-		if self.app_data.fractal_params.render_technique == rendering_technique
-		{
-			return;
-		}
-
-		self.reset_fractal_rendering();
-
-		self.app_data.fractal_params.render_technique = rendering_technique;
-		
-		self.app_data.require_redraw = true;
-	}
-
 	fn do_render(&mut self, commands: &mut wgpu::CommandEncoder, output: &wgpu::SurfaceTexture)
 	{
 		let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -251,12 +203,7 @@ impl<C: Compute> App<C>
 
 		self.render.make_render_pass(self.app_data.cells.values(), &view, commands);
 
-		let mut changed = false;
-		self.gui.draw(&self.target, commands, &view, |ui| changed = self.app_data.gui(ui));
-		if changed
-		{
-			self.reset_fractal_rendering();
-		}
+		self.gui.draw(&self.target, commands, &view, |ui| {self.app_data.gui(ui);});
 	}
 
 	pub fn redraw(&mut self) -> Result<(), wgpu::SurfaceError>
@@ -340,16 +287,16 @@ impl<C: Compute> App<C>
 				match keycode
 				{
 					KeyCode::Escape => event_loop.exit(),
-					KeyCode::KeyM => self.set_fractal_kind(FractalKind::MandelbrotSet),
-					KeyCode::Comma | KeyCode::Digit3 | KeyCode::Numpad3 => self.set_fractal_kind(FractalKind::Multibrot3),
-					KeyCode::KeyT => self.set_fractal_kind(FractalKind::Tricorn),
-					KeyCode::KeyS => self.set_fractal_kind(FractalKind::BurningShip),
-					KeyCode::KeyC => self.set_fractal_kind(FractalKind::CosLeaf),
-					KeyCode::KeyN => self.set_fractal_kind(FractalKind::Newton3),
-					KeyCode::KeyL => self.set_fractal_kind(FractalKind::Lyapunov),
+					KeyCode::KeyM => self.app_data.set_fractal_kind(FractalKind::MandelbrotSet),
+					KeyCode::Comma | KeyCode::Digit3 | KeyCode::Numpad3 => self.app_data.set_fractal_kind(FractalKind::Multibrot3),
+					KeyCode::KeyT => self.app_data.set_fractal_kind(FractalKind::Tricorn),
+					KeyCode::KeyS => self.app_data.set_fractal_kind(FractalKind::BurningShip),
+					KeyCode::KeyC => self.app_data.set_fractal_kind(FractalKind::CosLeaf),
+					KeyCode::KeyN => self.app_data.set_fractal_kind(FractalKind::Newton3),
+					KeyCode::KeyL => self.app_data.set_fractal_kind(FractalKind::Lyapunov),
 					KeyCode::KeyJ =>
 					{
-						self.set_fractal_variation(match self.app_data.fractal_params.variation
+						self.app_data.set_fractal_variation(match self.app_data.fractal_params.variation
 						{
 							FractalVariation::Normal => FractalVariation::JuliaSet,
 							FractalVariation::JuliaSet => FractalVariation::Normal,
@@ -359,7 +306,7 @@ impl<C: Compute> App<C>
 					},
 					KeyCode::KeyO =>
 					{
-						self.set_fractal_rendering(match self.app_data.fractal_params.render_technique
+						self.app_data.set_fractal_rendering(match self.app_data.fractal_params.render_technique
 						{
 							RenderTechnique::Normal => RenderTechnique::OrbitTrapPoint,
 							RenderTechnique::OrbitTrapPoint => RenderTechnique::OrbitTrapCross,
@@ -426,7 +373,7 @@ impl<C: Compute> App<C>
 					}
 					else if self.mouse_right_down
 					{
-						self.reset_fractal_rendering();
+						self.app_data.reset_fractal_rendering();
 						self.app_data.fractal_params.secondary_pos -= Complex64::new(position.x - prev_pos.x, position.y - prev_pos.y) * self.app_data.pixel_world_size();
 						self.target.window.request_redraw();
 					}
@@ -489,6 +436,7 @@ impl AppData
 		self.pos = DVec2::ZERO;
 		self.zoom = 1.0;
 		self.fractal_params.secondary_pos = Complex64::ZERO;
+		self.fractal_params.iteration_limit = self.fractal_params.fractal_kind.default_iteration_limit();
 	}
 
 	fn apply_zoom(&mut self, zoom_value: f64)
@@ -504,6 +452,49 @@ impl AppData
 		self.require_redraw = true;
 	}
 
+	fn reset_fractal_rendering(&mut self)
+	{
+		self.cells.clear();
+		self.require_redraw = true;
+	}
+
+	fn set_fractal_kind(&mut self, fractal_kind: FractalKind)
+	{
+		if self.fractal_params.fractal_kind == fractal_kind
+		{
+			return;
+		}
+
+		self.fractal_params.fractal_kind = fractal_kind;
+		
+		self.fractal_params.iteration_limit = self.fractal_params.fractal_kind.default_iteration_limit();
+		self.reset_fractal_rendering();
+	}
+
+	fn set_fractal_variation(&mut self, fractal_variation: FractalVariation)
+	{
+		if self.fractal_params.variation == fractal_variation
+		{
+			return;
+		}
+
+		self.fractal_params.variation = fractal_variation;
+		
+		self.reset_fractal_rendering();
+	}
+
+	fn set_fractal_rendering(&mut self, rendering_technique: RenderTechnique)
+	{
+		if self.fractal_params.render_technique == rendering_technique
+		{
+			return;
+		}
+
+		self.fractal_params.render_technique = rendering_technique;
+		
+		self.reset_fractal_rendering();
+	}
+	
 	fn base_pixel_world_size(&self) -> f64
 	{
 		4.0 / self.screen_size.width.min(self.screen_size.height) as f64
@@ -597,11 +588,11 @@ impl AppData
 			.resizable(false)
 			.show(ctx, |ui|
 			{
-				fn select_in_list<T: Eq>(ui: &mut egui::Ui, selected_value: &mut T, list: impl IntoIterator<Item = (T, &'static str)>) -> bool
+				fn select_in_list<T: Eq>(ui: &mut egui::Ui, selected_value: &T, list: impl IntoIterator<Item = (T, &'static str)>) -> Option<T>
 				{
 					ui.horizontal(|ui|
 					{
-						let mut changed = false;
+						let mut new_selected = None;
 	
 						for (value, name) in list
 						{
@@ -609,14 +600,12 @@ impl AppData
 							{
 								if *selected_value != value
 								{
-									*selected_value = value;
-									
-									changed = true;
+									new_selected = Some(value);
 								}
 							}
 						}
 	
-						changed
+						new_selected
 					}).inner
 				}
 
@@ -628,7 +617,7 @@ impl AppData
 						let mut changed = false;
 						
 						ui.label("Fractal Kind");
-						changed |= select_in_list(ui, &mut self.fractal_params.fractal_kind, [
+						if let Some(fractal_kind) = select_in_list(ui, &self.fractal_params.fractal_kind, [
 							(FractalKind::MandelbrotSet, "Mandelbrot Set"),
 							(FractalKind::Multibrot3, "Multibrot 3"),
 							(FractalKind::Tricorn, "Tricorn"),
@@ -636,15 +625,20 @@ impl AppData
 							(FractalKind::CosLeaf, "Cos Leaf"),
 							(FractalKind::Newton3, "Newton 3"),
 							(FractalKind::Lyapunov, "Lyapunov"),
-						]);
+						])
+						{
+							self.set_fractal_kind(fractal_kind);
+							changed = true;
+						}
 						ui.end_row();
 		
 						ui.label("Variation");
-						if select_in_list(ui, &mut self.fractal_params.variation, [
+						if let Some(fractal_variation) = select_in_list(ui, &self.fractal_params.variation, [
 							(FractalVariation::Normal, "Classic"),
 							(FractalVariation::JuliaSet, "Julia Set"),
 						])
 						{
+							self.set_fractal_variation(fractal_variation);
 							// Swap primary and secondary pos/zoom
 							(self.pos, self.fractal_params.secondary_pos) = (self.fractal_params.secondary_pos.to_vector(), Complex64::from_vector(self.pos));
 							(self.zoom, self.secondary_zoom) = (self.secondary_zoom, self.zoom);
@@ -653,12 +647,23 @@ impl AppData
 						ui.end_row();
 		
 						ui.label("Render Technique");
-						changed |= select_in_list(ui, &mut self.fractal_params.render_technique, [
+						if let Some(rendering_technique) = select_in_list(ui, &self.fractal_params.render_technique, [
 							(RenderTechnique::Normal, "Normal"),
 							(RenderTechnique::OrbitTrapPoint, "Orbit Trap Point"),
 							(RenderTechnique::OrbitTrapCross, "Orbit Trap Cross"),
 							(RenderTechnique::NormalMap, "Normal Map"),
-						]);
+						])
+						{
+							self.set_fractal_rendering(rendering_technique);
+							changed = true;
+						}
+						ui.end_row();
+						
+						ui.label("Iteration Limit");
+						ui.horizontal(|ui|
+						{
+							changed |= ui.add(egui::DragValue::new(&mut self.fractal_params.iteration_limit).speed(1)).changed();
+						});
 						ui.end_row();
 						
 						ui.label("Position");
@@ -707,7 +712,7 @@ impl AppData
 
 		if changed
 		{
-			self.require_redraw = true;
+			self.reset_fractal_rendering();
 		}
 		changed
 	}

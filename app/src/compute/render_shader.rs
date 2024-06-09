@@ -229,9 +229,6 @@ impl ShaderRenderCompute
 
 impl super::Compute for ShaderRenderCompute
 {
-    fn reset(&mut self)
-    { }
-
     fn update_before_render(&mut self, target: &Target, render: &Render, app: &mut AppData, commands: &mut wgpu::CommandEncoder)
     {
         // Find new cell to load

@@ -1,9 +1,11 @@
 use crate::math::*;
 
-const ITERATION_COUNT: usize = 1024;
+pub const ITERATION_COUNT: u32 = 1024;
 
-pub fn lyapunov<S: Scalar, const L: usize>(sequence: &[bool; L], pos: Vec2<S>) -> f32
+pub fn lyapunov<S: Scalar, const L: usize>(sequence: &[bool; L], pos: Vec2<S>, iteration_count: u32) -> f32
 {
+    let iteration_count = iteration_count as usize;
+    
     let zero = S::zero();
     let one = S::one();
     let two: S = 2.0_f32.into();
@@ -16,7 +18,7 @@ pub fn lyapunov<S: Scalar, const L: usize>(sequence: &[bool; L], pos: Vec2<S>) -
     let mut x: S = 0.5_f32.into();
     let mut lyapunov_exp = 0.0;
 
-    for i in 0..ITERATION_COUNT
+    for i in 0..iteration_count
     {
         let rn = if sequence[i % L] { pos.y() } else { pos.x() };
 
@@ -28,5 +30,5 @@ pub fn lyapunov<S: Scalar, const L: usize>(sequence: &[bool; L], pos: Vec2<S>) -
         x = rn * x * (one - x);
     }
 
-    lyapunov_exp / ITERATION_COUNT as f32
+    lyapunov_exp / iteration_count as f32
 }

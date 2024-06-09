@@ -76,9 +76,6 @@ impl ThreadedCompute
 
 impl super::Compute for ThreadedCompute
 {
-    fn reset(&mut self)
-    { }
-
     fn update_before_render(&mut self, target: &Target, render: &Render, app: &mut AppData, _commands: &mut wgpu::CommandEncoder)
     {
         // Find new cell to load

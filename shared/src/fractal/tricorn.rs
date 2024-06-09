@@ -2,7 +2,7 @@ use crate::math::*;
 use super::{escape_time_method::*, FractalParams};
 use num_traits::Zero;
 
-const ITERATION_COUNT: u32 = 1024;
+pub const ITERATION_COUNT: u32 = 1024;
 
 
 #[derive(Clone, Copy)]
@@ -51,7 +51,7 @@ impl<C: ComplexNumber> Function<C> for DConjugate
 
 pub fn tricorn<S: Scalar>(pos: Complex<S>, params: FractalParams<S>) -> EscapeResult
 {
-    compute_escape_time_fractal(pos, params, ITERATION_COUNT, DEFAULT_BAILOUT_RADIUS, Some(2.0), |z, c|
+    compute_escape_time_fractal(pos, params, DEFAULT_BAILOUT_RADIUS, Some(2.0), |z, c|
     {
         Func(Conjugate).compose(z).squared() + c
     })

@@ -116,7 +116,7 @@ where
     move |z| fun.get((z, Complex::<S>::ZERO))
 }
 
-pub fn compute_escape_time_fractal<S, F, IF>(pos: Complex<S>, params: FractalParams<S>, iteration_count: u32, bailout_radius: f32, potential_power: Option<f32>, iteration_function: F) -> EscapeResult
+pub fn compute_escape_time_fractal<S, F, IF>(pos: Complex<S>, params: FractalParams<S>, bailout_radius: f32, potential_power: Option<f32>, iteration_function: F) -> EscapeResult
 where
     S: Scalar,
     F: FnOnce(Func<Z<S>>, Func<C<S>>) -> Func<IF>,
@@ -132,13 +132,13 @@ where
     match params.render_technique
     {
         super::RenderTechnique::Normal =>
-            compute_escape_time::<S>(z, iteration_count, bailout_radius, potential_power, partial_apply::<S, _, _>(iteration_function, c)),
+            compute_escape_time::<S>(z, params.iteration_limit, bailout_radius, potential_power, partial_apply::<S, _, _>(iteration_function, c)),
         super::RenderTechnique::OrbitTrapPoint =>
-            EscapeResult::Escaped(compute_orbit_trap::<S>(z, iteration_count, partial_apply::<S, _, _>(iteration_function, c), |z| z.modulus_squared())),
+            EscapeResult::Escaped(compute_orbit_trap::<S>(z, params.iteration_limit, partial_apply::<S, _, _>(iteration_function, c), |z| z.modulus_squared())),
         super::RenderTechnique::OrbitTrapCross =>
-            EscapeResult::Escaped(compute_orbit_trap::<S>(z, iteration_count, partial_apply::<S, _, _>(iteration_function, c), |z| z.re().abs().min(z.im().abs()))),
+            EscapeResult::Escaped(compute_orbit_trap::<S>(z, params.iteration_limit, partial_apply::<S, _, _>(iteration_function, c), |z| z.re().abs().min(z.im().abs()))),
         super::RenderTechnique::NormalMap =>
-            compute_normal_map::<S, _, _>(z, c, iteration_count, bailout_radius, iteration_function),
+            compute_normal_map::<S, _, _>(z, c, params.iteration_limit, bailout_radius, iteration_function),
     }
 }
 

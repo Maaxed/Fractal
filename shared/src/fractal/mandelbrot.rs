@@ -4,7 +4,7 @@ use super::RenderTechnique;
 use super::escape_time_method::*;
 use super::FractalVariation;
 
-const ITERATION_COUNT: u32 = 1024;
+pub const ITERATION_COUNT: u32 = 1024;
 
 pub fn mandelbrot_value<S: Scalar>(pos: Complex<S>, params: FractalParams<S>) -> EscapeResult
 {
@@ -21,7 +21,7 @@ pub fn mandelbrot_value<S: Scalar>(pos: Complex<S>, params: FractalParams<S>) ->
         }
     }
 
-    compute_escape_time_fractal(pos, params, ITERATION_COUNT, DEFAULT_BAILOUT_RADIUS, Some(2.0), |z, c|
+    compute_escape_time_fractal(pos, params, DEFAULT_BAILOUT_RADIUS, Some(2.0), |z, c|
     {
         z.squared() + c
     })

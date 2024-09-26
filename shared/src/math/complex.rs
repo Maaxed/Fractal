@@ -7,7 +7,7 @@ use num_traits::{Zero, One, Inv};
 use super::function::{IntoFunc, Constant};
 use super::{Exp, Trigo, Scalar, Vec2};
 
-#[cfg(target_arch = "spirv")]
+#[cfg(feature = "libm")]
 use num_traits::Float;
 
 pub trait ComplexNumber:
@@ -71,8 +71,8 @@ pub trait ComplexNumber:
     fn to_complex64(self) -> Complex64;
 }
 
-#[cfg_attr(not(target_arch = "spirv"), repr(C))]
-#[cfg_attr(target_arch = "spirv", repr(simd))]
+#[cfg_attr(not(feature = "libm"), repr(C))]
+#[cfg_attr(feature = "libm", repr(simd))]
 #[cfg_attr(feature = "bytemuck", derive(NoUninit))]
 #[derive(Clone, Copy, PartialEq)]
 pub struct Complex64(f64, f64);
@@ -164,7 +164,7 @@ impl ComplexNumber for Complex64
 
     fn from_polar(modulus: f64, argument: f64) -> Self
     {
-        if cfg!(target_arch = "spirv")
+        if cfg!(feature = "libm")
         {
             Complex32::from_polar(modulus as f32, argument as f32).to_complex64()
         }
@@ -221,7 +221,7 @@ impl ComplexNumber for Complex64
     fn argument(self) -> f64
     {
         
-        if cfg!(target_arch = "spirv")
+        if cfg!(feature = "libm")
         {
             self.to_complex32().argument() as f64
         }
@@ -452,7 +452,7 @@ impl Exp for Complex64
 
     fn exp(self) -> Self
     {
-        if cfg!(target_arch = "spirv")
+        if cfg!(feature = "libm")
         {
             self.to_complex32().exp().to_complex64()
         }
@@ -469,7 +469,7 @@ impl Exp for Complex64
 
     fn ln(self) -> Self
     {
-        if cfg!(target_arch = "spirv")
+        if cfg!(feature = "libm")
         {
             self.to_complex32().ln().to_complex64()
         }
@@ -489,7 +489,7 @@ impl super::Trigo for Complex64
 {
     fn sin(self) -> Self
     {
-        if cfg!(target_arch = "spirv")
+        if cfg!(feature = "libm")
         {
             self.to_complex32().sin().to_complex64()
         }
@@ -502,7 +502,7 @@ impl super::Trigo for Complex64
     
     fn cos(self) -> Self
     {
-        if cfg!(target_arch = "spirv")
+        if cfg!(feature = "libm")
         {
             self.to_complex32().cos().to_complex64()
         }
@@ -514,8 +514,8 @@ impl super::Trigo for Complex64
     }
 }
 
-#[cfg_attr(not(target_arch = "spirv"), repr(C))]
-#[cfg_attr(target_arch = "spirv", repr(simd))]
+#[cfg_attr(not(feature = "libm"), repr(C))]
+#[cfg_attr(feature = "libm", repr(simd))]
 #[cfg_attr(feature = "bytemuck", derive(NoUninit))]
 #[derive(Clone, Copy, PartialEq)]
 pub struct Complex32(f32, f32);

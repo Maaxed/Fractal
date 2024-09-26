@@ -1,7 +1,7 @@
 #![no_std]
 #![deny(warnings)]
 
-#![cfg_attr(target_arch = "spirv", feature(repr_simd))]
+#![cfg_attr(feature = "libm", feature(repr_simd))]
 
 pub mod math;
 pub mod fractal;

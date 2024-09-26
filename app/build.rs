@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 {
     let path_to_shader = "../shader";
     let profile = "release";
-    let cargo_exe = format!("{}/bin/cargo", std::env::var("CARGO_HOME").unwrap());
+    let cargo_exe = format!("{}/bin/cargo", std::env::var("CARGO_HOME")?);
     let mut cargo = Command::new(cargo_exe);
     cargo.args([
         "build",
@@ -52,6 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     // Don't use the same version of rust toolchain
     cargo.env_remove("CARGO");
     cargo.env_remove("RUSTUP_TOOLCHAIN");
+    cargo.env_remove("RUSTC");
     
     let build = cargo
         .stderr(Stdio::inherit())
@@ -64,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         return Err(Error::BuildFailed.into());
     }
 
-    let stdout = String::from_utf8(build.stdout).unwrap();
+    let stdout = String::from_utf8(build.stdout)?;
     let mut build_script_messages = stdout.lines()
         .filter_map(|line|
         {

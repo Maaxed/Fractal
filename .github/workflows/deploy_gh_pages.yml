@@ -14,10 +14,12 @@ defaults:
 jobs:
 
   build:
-    name: Build & Test
+    name: Build
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Setup Toolchain
+      run: rustup target add wasm32-unknown-unknown
     - name: Build Wasm
       run: cargo run-wasm --build-only
     - name: Make pages artifact

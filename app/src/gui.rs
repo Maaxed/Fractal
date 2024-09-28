@@ -6,6 +6,7 @@ use egui_wgpu::{Renderer, ScreenDescriptor};
 use egui_winit::{EventResponse, State};
 use wgpu::{CommandEncoder, TextureView};
 use winit::event::WindowEvent;
+use winit::window::Theme;
 
 
 pub struct EguiRenderer
@@ -30,9 +31,9 @@ impl EguiRenderer
             }
         );
 
-        let state = State::new(context, id, &target.window, Some(target.window.scale_factor() as f32), None);
+        let state = State::new(context, id, &target.window, Some(target.window.scale_factor() as f32), Some(Theme::Dark), None);
 
-        let renderer = Renderer::new(&target.device, target.config.format, None, 1);
+        let renderer = Renderer::new(&target.device, target.config.format, None, 1, false);
 
         EguiRenderer
         {
@@ -51,7 +52,7 @@ impl EguiRenderer
         target: &Target,
         commands: &mut CommandEncoder,
         window_surface_view: &TextureView,
-        run_ui: impl FnOnce(&Context),
+        run_ui: impl FnMut(&Context),
     )
     {
         let pixels_per_point = target.window.scale_factor() as f32;
@@ -94,7 +95,7 @@ impl EguiRenderer
                     ],
                     ..Default::default()
                 }
-            );
+            ).forget_lifetime();
 
             self.renderer.render(&mut render_pass, &triangles, &screen_descriptor);
         }

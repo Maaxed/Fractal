@@ -22,7 +22,7 @@ pub mod wasm
         
         let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop");
         
-        let app = AppWrapper::new(wgpu::Limits::downlevel_webgl2_defaults(),
+        let mut app = AppWrapper::new(wgpu::Limits::downlevel_webgl2_defaults(),
             |window|
             {
                 web_sys::window()
@@ -36,7 +36,6 @@ pub mod wasm
                     .expect("Couldn't append canvas to document body.");
             });
 
-        //event_loop.run_app(&mut app).expect("Error while running the app");
-        app.run(event_loop).expect("Error while running the app");
+        event_loop.run_app(&mut app).expect("Error while running the app");
     }
 }

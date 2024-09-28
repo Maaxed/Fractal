@@ -18,6 +18,6 @@ codegen-units = 16
 opt-level = 3
 
 [dependencies]
-glam = { version = "0.24.1", default-features = false }
+glam = { version = "0.24.2", default-features = false }
 num-traits = { version = "0.2.18", default-features = false }
 bytemuck = { version = "1.13.1", features = ["derive"], optional = true }

@@ -76,6 +76,7 @@ impl Target
 					label: None,
 					required_features: optional_features & available_features,
 					required_limits: device_limits.using_resolution(adapter.limits()),
+					memory_hints: Default::default(),
 				},
 				None,
 			).await

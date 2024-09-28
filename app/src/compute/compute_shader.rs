@@ -99,7 +99,8 @@ impl Fixed
                 layout: Some(&pipeline_layout),
                 module: shader_module,
                 entry_point: "compute_mandelbrot",
-                //compilation_options: Default::default(),
+                compilation_options: Default::default(),
+                cache: None,
             });
         
         Self

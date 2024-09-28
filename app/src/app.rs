@@ -6,11 +6,11 @@ use pollster::FutureExt;
 use shared::math::*;
 use shared::fractal::{FractalKind, FractalVariation, RenderTechnique};
 use glam::{dvec2, DVec2, i64vec2};
+use winit::application::ApplicationHandler;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::WindowBuilder;
-use winit::event::Event as WinitEvent;
+use winit::window::WindowAttributes;
 
 use crate::gui::EguiRenderer;
 use crate::{Target, render};
@@ -29,7 +29,7 @@ pub struct AppWrapper<Init>
 {
 	device_limits: wgpu::Limits,
 	init_function: Init,
-	_app: Option<App<ShaderRenderCompute>>
+	app: Option<App<ShaderRenderCompute>>
 }
 
 impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
@@ -40,11 +40,11 @@ impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
 		{
 			device_limits,
 			init_function,
-			_app: None,
+			app: None,
 		}
 	}
 
-	pub fn run(self, event_loop: winit::event_loop::EventLoop<()>) -> Result<(), winit::error::EventLoopError>
+	/*pub fn run(self, event_loop: winit::event_loop::EventLoop<()>) -> Result<(), winit::error::EventLoopError>
 	{
     	let window_attributes = WindowBuilder::default().with_title("Fractal").with_maximized(true);
 		let window = window_attributes.build(&event_loop).expect("Failed to create window");
@@ -59,7 +59,7 @@ impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
 				_ => {},
 			}
 		})
-	}
+	}*/
 
 	fn build_app(&self, window: winit::window::Window) -> App<ShaderRenderCompute>
 	{
@@ -127,16 +127,16 @@ impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
 	}
 }
 
-/*impl<Init: Fn(&winit::window::Window)> ApplicationHandler for AppWrapper<Init>
+impl<Init: Fn(&winit::window::Window)> ApplicationHandler for AppWrapper<Init>
 {
 	fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop)
 	{
-    	let window_attributes = WindowAttributes::default().with_title("Fractal").with_maximized(true);
+		let window_attributes = WindowAttributes::default().with_title("Fractal").with_maximized(true);
 		let window = event_loop.create_window(window_attributes).expect("Failed to create window");
 
 		(self.init_function)(&window);
 
-		self.app = Some(build_app(window));
+		self.app = Some(self.build_app(window));
 	}
 
 	fn window_event(
@@ -153,7 +153,7 @@ impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
 	{
 		self.app.as_mut().unwrap().about_to_wait(event_loop);
 	}
-}*/
+}
 
 pub struct App<C>
 {
@@ -230,8 +230,7 @@ impl<C: Compute> App<C>
 
 	fn window_event(
 		&mut self,
-		//event_loop: &winit::event_loop::ActiveEventLoop,
-		event_loop: &winit::event_loop::EventLoopWindowTarget<()>,
+		event_loop: &winit::event_loop::ActiveEventLoop,
 		window_id: winit::window::WindowId,
 		event: WindowEvent,
 	)
@@ -384,7 +383,7 @@ impl<C: Compute> App<C>
 		}
 	}
 
-	fn about_to_wait(&mut self, _event_loop: &winit::event_loop::EventLoopWindowTarget<()> /*&winit::event_loop::ActiveEventLoop*/)
+	fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop)
 	{
 		if self.app_data.require_redraw
 		{
@@ -688,7 +687,7 @@ impl AppData
 						ui.horizontal(|ui|
 						{
 							let speed = self.zoom * 0.02;
-							ui.add(egui::DragValue::new(&mut self.zoom).speed(speed).suffix("x").clamp_range(f64::MIN_POSITIVE..=f64::MAX));
+							ui.add(egui::DragValue::new(&mut self.zoom).speed(speed).suffix("x").range(f64::MIN_POSITIVE..=f64::MAX));
 						});
 						ui.end_row();
 		

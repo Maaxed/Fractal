@@ -119,7 +119,7 @@ impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
 		};*/
 
 		let cell_size = PhysicalSize::new(256, 256);
-		let compute = crate::compute::ShaderRenderCompute::new(&target, &compute_shader_module, &compute_shader_module, cell_size, use_double_precision);
+		let compute = ShaderRenderCompute::new(&target, &compute_shader_module, &compute_shader_module, cell_size, use_double_precision);
 
 		let render = Render::new(&target, &vertex_shader_module, &fragment_shader_module, cell_size, use_double_precision);
 		
@@ -410,10 +410,10 @@ impl AppData
 {
 	pub fn new(cell_size: PhysicalSize<u32>, screen_size: PhysicalSize<u32>) -> Self
 	{
-		Self
+		let mut this = Self
 		{
 			cell_size: cell_size.width.min(cell_size.height),
-			screen_size,
+			screen_size: PhysicalSize::default(),
 			cells: BTreeMap::new(),
 			pos: DVec2::ZERO,
 			zoom: 1.0,
@@ -421,12 +421,20 @@ impl AppData
 			fractal_params: Default::default(),
 			prev_mouse_pos: None,
 			require_redraw: false,
-		}
+		};
+
+		this.resize(screen_size);
+
+		this
 	}
 
 	fn resize(&mut self, new_screen_size: PhysicalSize<u32>)
 	{
-		self.screen_size = new_screen_size;
+		self.screen_size = PhysicalSize
+		{
+			width: new_screen_size.width.max(1),
+			height: new_screen_size.height.max(1),
+		};
 	}
 
 	fn reset(&mut self)

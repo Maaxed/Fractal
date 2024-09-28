@@ -137,7 +137,9 @@ impl From<FractalParams64> for FractalParams32
             fractal_kind: value.fractal_kind,
             variation: value.variation,
             render_technique: value.render_technique,
-            ..Default::default()
+            iteration_limit: value.iteration_limit,
+            padding0: 0,
+            padding1: 0,
         }
     }
 }

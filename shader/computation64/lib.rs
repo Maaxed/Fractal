@@ -2,6 +2,7 @@
 #![deny(warnings)]
 
 use fractal_renderer_shared as shared;
+use shared::color::srgb_to_linear;
 use spirv_std::spirv;
 use spirv_std::glam::{Vec2, Vec4, vec2};
 
@@ -43,8 +44,8 @@ pub fn fragment(
     output_color: &mut Vec4,
 
     // Uniforms
-    #[spirv(uniform, descriptor_set = 0, binding = 0)] params : &shared::compute::Params64,
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] params: &shared::compute::Params64,
 )
 {
-    *output_color = (shared::compute::run_uv(input_uv.as_dvec2(), (*params).into()), 1.0).into();
+    *output_color = (srgb_to_linear(shared::compute::run_uv(input_uv.as_dvec2(), (*params).into())), 1.0).into();
 }

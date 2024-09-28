@@ -134,6 +134,8 @@ impl Instance
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
+            
+        let format = target.config.format.add_srgb_suffix();
         
 		let fractal_texture = target.device.create_texture(
 			&wgpu::TextureDescriptor
@@ -148,9 +150,9 @@ impl Instance
 				mip_level_count: 1,
 				sample_count: 1,
 				dimension: wgpu::TextureDimension::D2,
-				format: target.config.format,
+				format: format,
 				usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-				view_formats: &target.config.view_formats,
+				view_formats: &[format],
 			}
 		);
 

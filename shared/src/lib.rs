@@ -7,3 +7,4 @@ pub mod math;
 pub mod fractal;
 pub mod render;
 pub mod compute;
+pub mod color;

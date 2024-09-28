@@ -67,7 +67,7 @@ impl ShaderRenderCompute
                 push_constant_ranges: &[],
             });
 
-        let format = target.config.format.remove_srgb_suffix();
+        let format = target.config.format.add_srgb_suffix();
 
         let render_pipeline = target.device.create_render_pipeline(
             &wgpu::RenderPipelineDescriptor

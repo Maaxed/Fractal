@@ -18,7 +18,7 @@ pub mod wasm
     pub fn run_wasm()
     {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init().expect("Couldn't initialize logger");
+        console_log::init_with_level(log::Level::Info).expect("Couldn't initialize logger");
         
         let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop");
         

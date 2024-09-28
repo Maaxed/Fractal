@@ -704,6 +704,7 @@ dependencies = [
  "env_logger",
  "fractal_renderer_shared",
  "glam",
+ "log",
  "pollster",
  "serde",
  "serde_json",

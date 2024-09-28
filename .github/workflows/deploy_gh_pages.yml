@@ -25,7 +25,7 @@ jobs:
     - name: Make pages artifact
       uses: actions/upload-pages-artifact@v3
       with:
-        path: target/wasm-examples/fractal_renderer/
+        path: app/target/wasm-examples/fractal_renderer/
 
   deploy:
     name: Deploy

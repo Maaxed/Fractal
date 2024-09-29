@@ -183,7 +183,7 @@ pub fn compute_escape_time<S: Scalar>(mut z: Complex<S>, iteration_count: u32, b
 
 pub fn compute_orbit_trap<S: Scalar>(mut z: Complex<S>, iteration_count: u32, mut iteration_function: impl FnMut(Complex<S>) -> Complex<S>, mut distance_function: impl FnMut(Complex<S>) -> S) -> f32
 {
-    let mut dist = S::max_value();
+    let mut dist: S = 3.4e38_f32.into(); // Just under f32::MAX to avoid precision issues causing overflow
 
     for _i in 0..iteration_count
     {

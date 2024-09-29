@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
+use std::fmt::Debug;
 
 use egui::InnerResponse;
 use fractal_renderer_shared as shared;
-use pollster::FutureExt;
 use shared::math::*;
 use shared::fractal::{FractalKind, FractalVariation, RenderTechnique};
 use glam::{dvec2, DVec2, i64vec2};
@@ -15,7 +15,7 @@ use winit::window::WindowAttributes;
 use crate::gui::EguiRenderer;
 use crate::{Target, render};
 use crate::quad_cell::QuadPos;
-use crate::compute::{Compute, ShaderRenderCompute};
+use crate::compute::Compute;
 use crate::render::Render;
 
 const VERTEX32_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_vertex32.spv"));
@@ -24,23 +24,46 @@ const FRAGMENT_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader
 const COMPUTE32_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_computation32.spv")); // fractal_renderer_shader_compute32.spv
 const COMPUTE64_SHADER_CODE: &[u8] = include_bytes!(env!("fractal_renderer_shader_computation64.spv")); // fractal_renderer_shader_compute64.spv
 
-#[derive(Default)]
-pub struct AppWrapper<Init>
+type ShaderCompute = crate::compute::ShaderRenderCompute;
+
+pub struct AppWrapper<Init, C>
 {
-	device_limits: wgpu::Limits,
 	init_function: Init,
-	app: Option<App<ShaderRenderCompute>>
+	app: AppLifeCycle<C>
 }
 
-impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
+enum AppLifeCycle<C>
 {
-	pub fn new(device_limits: wgpu::Limits, init_function: Init) -> Self
+	Suspended,
+	Initializing,
+	Running(App<C>),
+}
+
+pub enum UserEvent<C>
+{
+	Initialized(App<C>),
+}
+
+impl<C> Debug for UserEvent<C>
+{
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+	{
+		match self
+		{
+			Self::Initialized(_) => f.write_str("UserEvent::Initialized")
+		}
+	}
+}
+
+
+impl<Init, C> AppWrapper<Init, C>
+{
+	pub fn new(init_function: Init) -> Self
 	{
 		Self
 		{
-			device_limits,
 			init_function,
-			app: None,
+			app: AppLifeCycle::Suspended,
 		}
 	}
 
@@ -60,12 +83,76 @@ impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
 			}
 		})
 	}*/
+}
 
-	fn build_app(&self, window: winit::window::Window) -> App<ShaderRenderCompute>
+impl<Init: Fn(winit::window::Window) -> Option<App<C>>, C: Compute> ApplicationHandler<UserEvent<C>> for AppWrapper<Init, C>
+{
+	fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop)
 	{
-		(self.init_function)(&window);
+		let window_attributes = WindowAttributes::default().with_title("Fractal").with_maximized(true);
+		let window = event_loop.create_window(window_attributes).expect("Failed to create window");
 
-		let target = Target::new(window, self.device_limits.clone()).block_on();
+		self.app = if let Some(app) = (self.init_function)(window)
+		{
+			AppLifeCycle::Running(app)
+		}
+		else
+		{
+			AppLifeCycle::Initializing
+		};
+	}
+
+	fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: UserEvent<C>)
+	{
+		match event
+		{
+			UserEvent::Initialized(app) =>
+			{
+				assert!(matches!(self.app, AppLifeCycle::Initializing));
+
+				self.app = AppLifeCycle::Running(app);
+			},
+		}
+	}
+
+	fn window_event(
+		&mut self,
+		event_loop: &winit::event_loop::ActiveEventLoop,
+		window_id: winit::window::WindowId,
+		event: WindowEvent,
+	)
+	{
+		if let AppLifeCycle::Running(app) = &mut self.app
+		{
+			app.window_event(event_loop, window_id, event);
+		}
+	}
+
+	fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop)
+	{
+		if let AppLifeCycle::Running(app) = &mut self.app
+		{
+			app.about_to_wait(event_loop);
+		}
+	}
+}
+
+pub struct App<C>
+{
+	target: Target,
+	gui: EguiRenderer,
+	render: Render,
+	compute: C,
+	app_data: AppData,
+	mouse_left_down: bool,
+	mouse_right_down: bool,
+}
+
+impl App<ShaderCompute>
+{
+	pub async fn build(device_limits: wgpu::Limits, window: winit::window::Window) -> Self
+	{
+		let target = Target::new(window, device_limits).await;
 		
 		let use_double_precision = target.device.features().contains(wgpu::Features::SHADER_F64);
 
@@ -119,7 +206,7 @@ impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
 		};*/
 
 		let cell_size = PhysicalSize::new(256, 256);
-		let compute = ShaderRenderCompute::new(&target, &compute_shader_module, &compute_shader_module, cell_size, use_double_precision);
+		let compute = ShaderCompute::new(&target, &compute_shader_module, &compute_shader_module, cell_size, use_double_precision);
 
 		let render = Render::new(&target, &vertex_shader_module, &fragment_shader_module, cell_size, use_double_precision);
 		
@@ -127,48 +214,10 @@ impl<Init: Fn(& winit::window::Window)> AppWrapper<Init>
 	}
 }
 
-impl<Init: Fn(&winit::window::Window)> ApplicationHandler for AppWrapper<Init>
-{
-	fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop)
-	{
-		let window_attributes = WindowAttributes::default().with_title("Fractal").with_maximized(true);
-		let window = event_loop.create_window(window_attributes).expect("Failed to create window");
-
-		(self.init_function)(&window);
-
-		self.app = Some(self.build_app(window));
-	}
-
-	fn window_event(
-		&mut self,
-		event_loop: &winit::event_loop::ActiveEventLoop,
-		window_id: winit::window::WindowId,
-		event: WindowEvent,
-	)
-	{
-		self.app.as_mut().unwrap().window_event(event_loop, window_id, event);
-	}
-
-	fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop)
-	{
-		self.app.as_mut().unwrap().about_to_wait(event_loop);
-	}
-}
-
-pub struct App<C>
-{
-	target: Target,
-	gui: EguiRenderer,
-	render: Render,
-	compute: C,
-	app_data: AppData,
-	mouse_left_down: bool,
-	mouse_right_down: bool,
-}
-
 impl<C: Compute> App<C>
 {
-	pub fn new(target: Target, compute: C, render: Render, cell_size: PhysicalSize<u32>) -> Self
+
+	fn new(target: Target, compute: C, render: Render, cell_size: PhysicalSize<u32>) -> Self
 	{
 		let gui = EguiRenderer::new(&target);
 		let screen_size = target.window.inner_size();

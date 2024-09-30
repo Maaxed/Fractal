@@ -29,5 +29,12 @@ fn build_shader(path_to_crate: impl AsRef<Path>, uses_float64: bool) -> Result<C
         builder = builder.capability(Capability::Float64);
     }
 
+    match std::env::var("PROFILE").as_deref()
+    {
+        Ok("release") => builder = builder.release(true),
+        Ok("debug" | "dev") => builder = builder.release(true),
+        _ => {},
+    }
+
     builder.build()
 }

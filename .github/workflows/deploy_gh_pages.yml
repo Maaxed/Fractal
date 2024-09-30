@@ -21,7 +21,7 @@ jobs:
     - name: Setup Toolchain
       run: rustup target add wasm32-unknown-unknown
     - name: Build Wasm
-      run: cargo run-wasm --build-only
+      run: cargo run-wasm --build-only --release
     - name: Make pages artifact
       uses: actions/upload-pages-artifact@v3
       with:

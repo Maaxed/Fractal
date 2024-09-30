@@ -744,7 +744,7 @@ impl AppData
 						ui.horizontal(|ui|
 						{
 							let speed = self.zoom * 0.02;
-							ui.add(egui::DragValue::new(&mut self.zoom).speed(speed).suffix("x").range(f64::MIN_POSITIVE..=f64::MAX));
+							ui.add(egui::DragValue::new(&mut self.zoom).speed(speed).suffix("x").range(0.000000000000001..=f64::MAX));
 						});
 						ui.end_row();
 		

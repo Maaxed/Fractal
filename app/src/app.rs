@@ -435,7 +435,7 @@ impl<C: Compute> App<C>
 					return;
 				}
 				
-				self.app_data.apply_zoom(*delta, None);
+				self.app_data.apply_zoom(*delta * 0.01, None);
 			},
 			WindowEvent::Touch(touch) =>
 			{
@@ -526,7 +526,7 @@ impl<C: Compute> App<C>
 
 							let delta_dist = new_dist - old_dist;
 
-							self.app_data.apply_zoom(delta_dist, Some(PhysicalPosition::new(center.x, center.y)));
+							self.app_data.apply_zoom(delta_dist * 0.01, Some(PhysicalPosition::new(center.x, center.y)));
 						}
 						else if touch.id == id1
 						{

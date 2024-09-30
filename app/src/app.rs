@@ -8,7 +8,7 @@ use shared::fractal::{FractalKind, FractalVariation, RenderTechnique};
 use glam::{dvec2, DVec2, i64vec2};
 use winit::application::ApplicationHandler;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
-use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowAttributes;
 
@@ -381,11 +381,11 @@ impl<C: Compute> App<C>
 				{
 					MouseScrollDelta::LineDelta(_dx, dy) =>
 					{
-						self.app_data.apply_zoom(*dy as f64);
+						self.app_data.apply_zoom(*dy as f64, self.app_data.prev_mouse_pos);
 					},
 					MouseScrollDelta::PixelDelta(delta) =>
 					{
-						self.app_data.apply_zoom(delta.y * 0.01);
+						self.app_data.apply_zoom(delta.y * 0.01, self.app_data.prev_mouse_pos);
 					},
 				}
 			},
@@ -428,6 +428,116 @@ impl<C: Compute> App<C>
 				}
 				self.app_data.prev_mouse_pos = Some(*position);
 			},
+			WindowEvent::PinchGesture { delta, phase: TouchPhase::Moved, .. } =>
+			{
+				if response.consumed
+				{
+					return;
+				}
+				
+				self.app_data.apply_zoom(*delta, None);
+			},
+			WindowEvent::Touch(touch) =>
+			{
+				match touch.phase
+				{
+					TouchPhase::Started =>
+					{
+						if response.consumed
+						{
+							return;
+						}
+
+						for prev_touch in self.app_data.prev_touch_pos.each_mut()
+						{
+							if let Some((id, pos)) = prev_touch
+							{
+								if *id == touch.id
+								{
+									*pos = touch.location;
+									break;
+								}
+							}
+							else
+							{
+								*prev_touch = Some((touch.id, touch.location));
+								break;
+							}
+						}
+					},
+					TouchPhase::Ended | TouchPhase::Cancelled =>
+					{
+						if let Some((id, _pos)) = self.app_data.prev_touch_pos[0]
+						{
+							if id == touch.id
+							{
+								// Shift elements of the array
+								self.app_data.prev_touch_pos[0] = self.app_data.prev_touch_pos[1];
+								self.app_data.prev_touch_pos[1] = None;
+							}
+							else if let Some((id, _pos)) = self.app_data.prev_touch_pos[1]
+							{
+								if id == touch.id
+								{
+									self.app_data.prev_touch_pos[1] = None;
+								}
+							}
+						}
+					}
+					TouchPhase::Moved =>
+					{
+						if response.consumed
+						{
+							return;
+						}
+
+						let Some((id1, pos1)) = self.app_data.prev_touch_pos[0]
+						else
+						{
+							return;
+						};
+
+						if let Some((id2, pos2)) = self.app_data.prev_touch_pos[1]
+						{
+							let second_pos = if touch.id == id1
+							{
+								self.app_data.prev_touch_pos[0] = Some((touch.id, touch.location));
+								pos2
+							}
+							else if touch.id == id2
+							{
+								self.app_data.prev_touch_pos[1] = Some((touch.id, touch.location));
+								pos1
+							}
+							else
+							{
+								return;
+							};
+
+							let pos1 = dvec2(pos1.x, pos1.y);
+							let pos2 = dvec2(pos2.x, pos2.y);
+							let touch_pos = dvec2(touch.location.x, touch.location.y);
+							let second_pos = dvec2(second_pos.x, second_pos.y);
+
+							let old_dist = pos1.distance(pos2);
+							let new_dist = touch_pos.distance(second_pos);
+
+							let center = (touch_pos + second_pos) * 0.5;
+
+							let delta_dist = new_dist - old_dist;
+
+							self.app_data.apply_zoom(delta_dist, Some(PhysicalPosition::new(center.x, center.y)));
+						}
+						else if touch.id == id1
+						{
+							self.app_data.pos -= dvec2(touch.location.x - pos1.x, pos1.y - touch.location.y) * self.app_data.pixel_world_size();
+							self.target.window.request_redraw();
+							
+							self.app_data.prev_touch_pos[0] = Some((touch.id, touch.location));
+						}
+					}
+				}
+			},
 			_ => {}
 		}
 	}
@@ -452,6 +562,7 @@ pub struct AppData
 	secondary_zoom: f64,
 	pub(crate) fractal_params: shared::fractal::FractalParams64,
 	prev_mouse_pos: Option<PhysicalPosition<f64>>,
+	prev_touch_pos: [Option<(u64, PhysicalPosition<f64>)>; 2],
 	require_redraw: bool,
 }
 
@@ -469,6 +580,7 @@ impl AppData
 			secondary_zoom: 1.0,
 			fractal_params: Default::default(),
 			prev_mouse_pos: None,
+			prev_touch_pos: [None, None],
 			require_redraw: false,
 		};
 
@@ -495,14 +607,14 @@ impl AppData
 		self.fractal_params.iteration_limit = self.fractal_params.fractal_kind.default_iteration_limit();
 	}
 
-	fn apply_zoom(&mut self, zoom_value: f64)
+	fn apply_zoom(&mut self, zoom_value: f64, zoom_center: Option<PhysicalPosition<f64>>)
 	{
 		let old_zoom = self.zoom;
 		self.zoom *= (-zoom_value * 0.5).exp();
 
-		if let Some(mouse_pos) = self.prev_mouse_pos
+		if let Some(zoom_center) = zoom_center
 		{
-			self.pos += dvec2(mouse_pos.x - self.screen_size.width as f64 * 0.5, self.screen_size.height as f64 * 0.5 - mouse_pos.y) * self.base_pixel_world_size() * (old_zoom - self.zoom);
+			self.pos += dvec2(zoom_center.x - self.screen_size.width as f64 * 0.5, self.screen_size.height as f64 * 0.5 - zoom_center.y) * self.base_pixel_world_size() * (old_zoom - self.zoom);
 		}
 		
 		self.require_redraw = true;

@@ -186,8 +186,8 @@ impl From<FractalParams32> for FractalParams<f32>
             variation: value.variation,
             render_technique: value.render_technique,
             iteration_limit: value.iteration_limit,
-            color_palette: ColorPalette::Default,
-            color_frequency: 1.0,
+            color_palette: value.color_palette,
+            color_frequency: value.color_frequency,
         }
     }
 }

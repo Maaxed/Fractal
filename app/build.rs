@@ -37,6 +37,8 @@ impl std::error::Error for Error
 
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
+    println!("cargo:rerun-if-changed=NULL"); // Force rerun build.rs every time
+
     let path_to_shader = "../shader";
     let profile = "release";
     let cargo_exe = format!("{}/bin/cargo", std::env::var("CARGO_HOME")?);

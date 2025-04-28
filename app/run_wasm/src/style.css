@@ -4,7 +4,19 @@ body {
     border: 0;
 }
 
+body::before {
+    content: "Loading...";
+    font-weight: bold;
+    font-size: 2rem;
+    position: absolute;
+    width: 100%;
+    top: 45%;
+    text-align: center;
+}
+
 canvas {
+    position: absolute;
+    z-index: 1;
     margin: 0;
     padding: 0;
     border: 0;

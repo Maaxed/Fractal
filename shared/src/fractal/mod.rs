@@ -69,6 +69,16 @@ pub enum RenderTechnique
     NormalMap,
 }
 
+#[repr(u32)]
+#[cfg_attr(feature = "bytemuck", derive(NoUninit))]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ColorPalette
+{
+    Default,
+    Flames,
+    Temperature,
+}
+
 #[repr(C)]
 #[cfg_attr(feature = "bytemuck", derive(NoUninit))]
 #[derive(Copy, Clone)]
@@ -79,8 +89,8 @@ pub struct FractalParams32
     pub variation: FractalVariation,
     pub render_technique: RenderTechnique,
     pub iteration_limit: u32,
-    padding0: u32,
-    padding1: u32,
+    pub color_palette: ColorPalette,
+    pub color_frequency: f32,
 }
 
 impl Default for FractalParams32
@@ -94,8 +104,8 @@ impl Default for FractalParams32
             variation: FractalVariation::Normal,
             render_technique: RenderTechnique::Normal,
             iteration_limit: 0,
-            padding0: 0,
-            padding1: 0,
+            color_palette: ColorPalette::Default,
+            color_frequency: 1.0,
         }
     }
 }
@@ -110,6 +120,10 @@ pub struct FractalParams64
     pub variation: FractalVariation,
     pub render_technique: RenderTechnique,
     pub iteration_limit: u32,
+    pub color_palette: ColorPalette,
+    pub color_frequency: f32,
+    padding0: u32,
+    padding1: u32,
 }
 
 impl Default for FractalParams64
@@ -123,6 +137,10 @@ impl Default for FractalParams64
             variation: FractalVariation::Normal,
             render_technique: RenderTechnique::Normal,
             iteration_limit: FractalKind::MandelbrotSet.default_iteration_limit(),
+            color_palette: ColorPalette::Default,
+            color_frequency: 1.0,
+            padding0: 0,
+            padding1: 0,
         }
     }
 }
@@ -138,8 +156,8 @@ impl From<FractalParams64> for FractalParams32
             variation: value.variation,
             render_technique: value.render_technique,
             iteration_limit: value.iteration_limit,
-            padding0: 0,
-            padding1: 0,
+            color_palette: value.color_palette,
+            color_frequency: value.color_frequency,
         }
     }
 }
@@ -153,6 +171,8 @@ pub struct FractalParams<S: Scalar>
     pub variation: FractalVariation,
     pub render_technique: RenderTechnique,
     pub iteration_limit: u32,
+    pub color_palette: ColorPalette,
+    pub color_frequency: f32,
 }
 
 impl From<FractalParams32> for FractalParams<f32>
@@ -166,6 +186,8 @@ impl From<FractalParams32> for FractalParams<f32>
             variation: value.variation,
             render_technique: value.render_technique,
             iteration_limit: value.iteration_limit,
+            color_palette: ColorPalette::Default,
+            color_frequency: 1.0,
         }
     }
 }
@@ -181,12 +203,11 @@ impl From<FractalParams64> for FractalParams<f64>
             variation: value.variation,
             render_technique: value.render_technique,
             iteration_limit: value.iteration_limit,
+            color_palette: value.color_palette,
+            color_frequency: value.color_frequency,
         }
     }
 }
-
-const PALETTE: [Vec3; 7] = [vec3(1.0, 0.5, 0.0), vec3(0.5, 0.0, 1.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 1.0), vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, 0.0), vec3(1.0, 0.5, 0.0)];
-const PALETTE_SIZE: usize = PALETTE.len();
 
 pub fn compute_fractal_color<S: Scalar>(pos: Complex<S>, params: FractalParams<S>) -> Vec3
 {
@@ -209,21 +230,6 @@ pub fn compute_fractal_color<S: Scalar>(pos: Complex<S>, params: FractalParams<S
         },
     };
 
-    /*
-    // Gradient: black - red - yellow - white
-    let threshold1 = 0.2;
-    let threshold2 = 0.6;
-    let r = if v > threshold1 { 1.0 } else { v / threshold1 };
-    let g = if v > threshold2 { 1.0 } else if v > threshold1 { (v - threshold1) / (threshold2 - threshold1) } else { 0.0 };
-    let b = if v > threshold2 { (v - threshold2) / (1.0 - threshold2) } else { 0.0 };
-
-    // Gradient: black - red - yellow - black
-    let threshold1 = 0.2;
-    let threshold2 = 0.6;
-    let r = if v > threshold2 { 1.0 - (v - threshold2) / (1.0 - threshold2) } else if v > threshold1 { 1.0 } else { v / threshold1 };
-    let g = if v > threshold2 { 1.0 - (v - threshold2) / (1.0 - threshold2) } else if v > threshold1 { (v - threshold1) / (threshold2 - threshold1) } else { 0.0 };
-    let b = 0.0;
-    */
     match res
     {
         EscapeResult::StayedInside => vec3(0.0, 0.0, 0.0),
@@ -238,15 +244,29 @@ pub fn compute_fractal_color<S: Scalar>(pos: Complex<S>, params: FractalParams<S
             {
                 let v = ln(v);
 
-                //Gradient: orange - purple - blue - cyan - white - yellow
-                let v = rem_euclid(v, (PALETTE_SIZE - 1) as f32);
+                let v = v * params.color_frequency;
 
-                let i = floor(v) as usize;
-                let t = v % 1.0;
-                let c1 = PALETTE[i];
-                let c2 = PALETTE[i+1];
-                c1 + (c2 - c1) * t
+                match params.color_palette
+                {
+                    // orange purple blue cyan white yellow
+                    ColorPalette::Default => sample_palette(v, &[vec3(1.0, 0.5, 0.0), vec3(0.5, 0.0, 1.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 1.0), vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, 0.0)]),
+                    // yellow red black red yellow white
+                    ColorPalette::Flames => sample_palette(v, &[vec3(1.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(1.0, 1.0, 0.0), vec3(1.0, 1.0, 1.0)]),
+                    // cyan purple black red yellow white
+                    ColorPalette::Temperature => sample_palette(v, &[vec3(0.0, 1.0, 1.0), vec3(0.5, 0.0, 1.0), vec3(0.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(1.0, 1.0, 0.0), vec3(1.0, 1.0, 1.0)]),
+                }
             }
         },
     }
+}
+
+fn sample_palette<const N: usize>(v: f32, palette: &[Vec3; N]) -> Vec3
+{
+    let v = rem_euclid(v, N as f32);
+
+    let i = floor(v) as usize;
+    let t = v % 1.0;
+    let c1 = palette[i];
+    let c2 = palette[(i+1) % N];
+    c1 + (c2 - c1) * t
 }

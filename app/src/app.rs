@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 
 use egui::InnerResponse;
+use fractal_renderer_shared::fractal::ColorPalette;
 use fractal_renderer_shared as shared;
 use shared::math::*;
 use shared::fractal::{FractalKind, FractalVariation, RenderTechnique};
@@ -662,6 +663,18 @@ impl AppData
 		
 		self.reset_fractal_rendering();
 	}
+
+	fn set_color_palette(&mut self, color_palette: ColorPalette)
+	{
+		if self.fractal_params.color_palette == color_palette
+		{
+			return;
+		}
+
+		self.fractal_params.color_palette = color_palette;
+		
+		self.reset_fractal_rendering();
+	}
 	
 	fn base_pixel_world_size(&self) -> f64
 	{
@@ -857,6 +870,26 @@ impl AppData
 						{
 							let speed = self.zoom * 0.02;
 							ui.add(egui::DragValue::new(&mut self.zoom).speed(speed).suffix("x").range(0.000000000000001..=f64::MAX));
+						});
+						ui.end_row();
+						
+						ui.label("Color Palette");
+						if let Some(color_palette) = select_in_list(ui, &self.fractal_params.color_palette, [
+							(ColorPalette::Default, "Default"),
+							(ColorPalette::Flames, "Flames"),
+							(ColorPalette::Temperature, "Temperature"),
+						])
+						{
+							self.set_color_palette(color_palette);
+							changed = true;
+						}
+						ui.end_row();
+						
+						ui.label("Color Frequency");
+						ui.horizontal(|ui|
+						{
+							let speed = self.fractal_params.color_frequency * 0.02;
+							changed |= ui.add(egui::DragValue::new(&mut self.fractal_params.color_frequency).speed(speed).range(0.000000000000001..=f64::MAX)).changed();
 						});
 						ui.end_row();
 		

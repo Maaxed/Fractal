@@ -266,6 +266,7 @@ fn sample_palette<const N: usize>(v: f32, palette: &[Vec3; N]) -> Vec3
 
     let i = floor(v) as usize;
     let t = v % 1.0;
+    let t = t*t * (3.0 - 2.0*t);
     let c1 = palette[i];
     let c2 = palette[(i+1) % N];
     c1 + (c2 - c1) * t
